@@ -9,7 +9,7 @@ struct RootView: View {
     @State private var showChapters = false
     @State private var speed = 1.0
     @State private var sleepMinutes = 0
-    private let bookTypes: [UTType] = [.epub, .plainText]
+    private let bookTypes: [UTType] = [UTType(filenameExtension: "epub") ?? .data, .plainText]
 
     var body: some View {
         ZStack {
