@@ -1,6 +1,10 @@
 name: TingX
 options:
   bundleIdPrefix: com.huangenxu
+packages:
+  ZIPFoundation:
+    url: https://github.com/weichsel/ZIPFoundation
+    exactVersion: 0.9.20
 targets:
   TingX:
     type: application
@@ -8,9 +12,12 @@ targets:
     deploymentTarget: "17.0"
     sources:
       - path: TingX
+    dependencies:
+      - package: ZIPFoundation
     info:
       path: Generated/Info.plist
       properties:
+        UIBackgroundModes: [audio]
         UILaunchScreen: {}
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
@@ -21,3 +28,13 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         GENERATE_INFOPLIST_FILE: YES
         CODE_SIGNING_ALLOWED: NO
+  ListeningChecks:
+    type: tool
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: Tests/main.swift
+      - path: TingX/BookText.swift
+      - path: TingX/ListeningBook.swift
+    dependencies:
+      - package: ZIPFoundation

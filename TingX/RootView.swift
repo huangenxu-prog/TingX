@@ -7,8 +7,7 @@ struct RootView: View {
     @State private var importing = false
     @State private var settings = false
     @State private var showChapters = false
-    @State private var speed = 1.0
-    @State private var sleepMinutes = 0
+    @StateObject private var narrator = Narrator()
     private let bookTypes: [UTType] = [UTType(filenameExtension: "epub") ?? .data, .plainText]
 
     var body: some View {
@@ -20,6 +19,7 @@ struct RootView: View {
                 bottomBar
             }
         }
+        .onChange(of: library.selectedID, initial: true) { _, _ in narrator.open(library) }
         .preferredColorScheme(.light)
         .fileImporter(isPresented: $importing, allowedContentTypes: bookTypes, allowsMultipleSelection: true) { result in
             switch result {
@@ -30,8 +30,19 @@ struct RootView: View {
         .sheet(isPresented: $settings) { settingsSheet }
         .sheet(isPresented: $showChapters) {
             NavigationStack {
-                ContentUnavailableView("章节目录尚未就绪", systemImage: "list.bullet",
-                    description: Text("EPUB 章节解析将在下一阶段接入。"))
+                List(narrator.titles.indices, id: \.self) { index in
+                    Button {
+                        narrator.loadChapter(index, autoplay: narrator.playing)
+                        showChapters = false
+                    } label: {
+                        HStack {
+                            Text(narrator.titles[index])
+                            Spacer()
+                            if index == narrator.chapter { Image(systemName: "checkmark") }
+                        }
+                    }
+                }
+                .tint(TingTheme.green)
                     .navigationTitle("章节目录")
                     .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { showChapters = false } } }
             }
@@ -76,48 +87,53 @@ struct RootView: View {
             VStack(spacing: 8) {
                 Text(library.selected?.title ?? "导入一本书，开始收听")
                     .font(.title2.bold()).lineLimit(2).multilineTextAlignment(.center)
-                Text(library.selected == nil ? "支持本地 EPUB / TXT" : "尚未接入离线语音引擎")
+                Text(library.selected == nil ? "支持本地 EPUB / TXT" : (narrator.loading ? "正在读取正文…" : narrator.titles.indices.contains(narrator.chapter) ? narrator.titles[narrator.chapter] : "暂无章节"))
                     .font(.subheadline).foregroundStyle(TingTheme.muted)
-                Text("等待语音引擎").font(.subheadline.weight(.medium)).padding(.top, 4)
+                Text(narrator.finished ? "已听完" : (narrator.pieces.indices.contains(narrator.segment) ? narrator.pieces[narrator.segment] : " ")).lineLimit(2).font(.subheadline.weight(.medium)).padding(.top, 4)
             }
             .frame(maxWidth: .infinity)
 
             VStack(spacing: 8) {
-                Capsule().fill(TingTheme.track).frame(height: 5)
+                ProgressView(value: narrator.finished ? 1 : Double(narrator.segment) / Double(max(1, narrator.pieces.count))).tint(TingTheme.green)
                 HStack {
-                    Text("00:00")
+                    Text(narrator.pieces.isEmpty ? "" : "第 \(narrator.segment + 1) / \(narrator.pieces.count) 段")
                     Spacer()
-                    Text("00:00")
+                    Text(narrator.titles.isEmpty ? "" : "第 \(narrator.chapter + 1) / \(narrator.titles.count) 节")
                 }.font(.caption).foregroundStyle(TingTheme.muted)
             }.padding(.top, 14)
 
             HStack {
-                Image(systemName: "backward.end.fill")
+                Button { narrator.loadChapter(narrator.chapter - 1, autoplay: narrator.playing, direction: -1) } label: {
+                    Image(systemName: "backward.end.fill")
+                }.disabled(narrator.chapter == 0).accessibilityLabel("上一章")
                 Spacer()
-                Image(systemName: "gobackward.15")
+                Button { narrator.move(-1) } label: { Image(systemName: "gobackward") }
+                    .accessibilityLabel("上一段")
                 Spacer()
-                Image(systemName: "play.fill").font(.title)
-                    .foregroundStyle(.white)
-                    .frame(width: 72, height: 72)
-                    .background(TingTheme.green, in: RoundedRectangle(cornerRadius: 25))
+                Button { narrator.toggle() } label: {
+                    Image(systemName: narrator.playing ? "pause.fill" : "play.fill").font(.title)
+                        .foregroundStyle(.white).frame(width: 72, height: 72)
+                        .background(TingTheme.green, in: RoundedRectangle(cornerRadius: 25))
+                }.accessibilityLabel(narrator.playing ? "暂停" : "朗读")
                 Spacer()
-                Image(systemName: "goforward.15")
+                Button { narrator.move(1) } label: { Image(systemName: "goforward") }
+                    .accessibilityLabel("下一段")
                 Spacer()
-                Image(systemName: "forward.end.fill")
+                Button { narrator.loadChapter(narrator.chapter + 1, autoplay: narrator.playing) } label: {
+                    Image(systemName: "forward.end.fill")
+                }.disabled(narrator.chapter + 1 >= narrator.titles.count).accessibilityLabel("下一章")
             }
-            .font(.title2).foregroundStyle(TingTheme.green)
-            .opacity(library.selected == nil ? 0.35 : 0.65)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("播放功能尚未接入")
+            .buttonStyle(.plain).font(.title2).foregroundStyle(TingTheme.green)
+            .disabled(narrator.loading || (narrator.pieces.isEmpty && !narrator.finished))
 
             HStack(spacing: 0) {
-                utility("speedometer", "语速", String(format: "%.1f×", speed)) {
-                    speed = speed >= 1.5 ? 0.8 : (speed * 10 + 1).rounded() / 10
+                utility("speedometer", "语速", String(format: "%.1f×", narrator.speed)) {
+                    narrator.changeSpeed()
                 }
-                utility("moon", "定时关闭", sleepMinutes == 0 ? "关闭" : "\(sleepMinutes)分钟") {
-                    sleepMinutes = sleepMinutes == 0 ? 15 : sleepMinutes == 15 ? 30 : sleepMinutes == 30 ? 60 : 0
+                utility("moon", "定时关闭", narrator.sleepMinutes == 0 ? "关闭" : "\(narrator.sleepMinutes)分钟") {
+                    narrator.cycleTimer()
                 }
-                utility("list.bullet", "章节目录", "查看") { showChapters = true }
+                utility("list.bullet", "章节目录", "查看") { showChapters = true }.disabled(narrator.titles.isEmpty)
             }
             .padding(.vertical, 14)
             .background(.white.opacity(0.86), in: RoundedRectangle(cornerRadius: 23))
@@ -270,7 +286,7 @@ struct RootView: View {
             Form {
                 Section("TingX") {
                     LabeledContent("本地书籍", value: "\(library.books.count) 本")
-                    LabeledContent("语音引擎", value: "尚未接入")
+                    LabeledContent("语音引擎", value: "iOS 本地中文语音")
                 }
                 Section("隐私") {
                     Text("仅使用本地导入文件，不需要账号、云同步或在线书城。")

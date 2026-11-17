@@ -1,10 +1,13 @@
 import Foundation
+import Combine
 
 struct AudioBook: Identifiable, Codable, Equatable {
     var id: UUID
     var title: String
     var filename: String
     var addedAt: Date
+    var chapter: Int?
+    var segment: Int?
     var progress: Double
 }
 
@@ -19,6 +22,16 @@ final class AudioLibrary: ObservableObject {
 
     init() { load() }
     var selected: AudioBook? { books.first(where: { $0.id == selectedID }) }
+
+    func url(for book: AudioBook) -> URL { root.appendingPathComponent(book.filename) }
+
+    func bookmark(_ id: UUID, chapter: Int, segment: Int, progress: Double) {
+        guard let i = books.firstIndex(where: { $0.id == id }) else { return }
+        books[i].chapter = chapter
+        books[i].segment = segment
+        books[i].progress = progress
+        save()
+    }
 
     func importFiles(_ urls: [URL]) {
         for url in urls {
