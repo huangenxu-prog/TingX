@@ -1,0 +1,42 @@
+name: Build TingX iOS
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+concurrency:
+  group: tingx-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: xcodegen generate
+      - name: Build iOS simulator
+        run: |
+          set -o pipefail
+          xcodebuild -project TingX.xcodeproj -scheme TingX -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build | tee simulator.log
+      - name: Build iPhone
+        run: |
+          set -o pipefail
+          xcodebuild -project TingX.xcodeproj -scheme TingX -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath DeviceBuild CODE_SIGNING_ALLOWED=NO build | tee device.log
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p package/Payload
+          cp -R DeviceBuild/Build/Products/Release-iphoneos/TingX.app package/Payload/
+          cd package && zip -qr ../TingX-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TingX-unsigned
+          path: TingX-unsigned.ipa
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: TingX-build-logs
+          path: |
+            simulator.log
+            device.log
