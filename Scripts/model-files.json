@@ -2,31 +2,6 @@
   "revision": "b3ce34bd5be2340796e3e1bc1ca55145a5482890",
   "files": [
     {
-      "path": "Flow-N250-fp16.mlmodelc/analytics/coremldata.bin",
-      "size": 243,
-      "digest": "284d3e102c55d68802a44985f987e70546706cc3331506a7919610672a0c02e9"
-    },
-    {
-      "path": "Flow-N250-fp16.mlmodelc/coremldata.bin",
-      "size": 491,
-      "digest": "26bb56ba0063c0938eb7329bb264d50ce9a23a88a54ddf7644bc6688d636ad8c"
-    },
-    {
-      "path": "Flow-N250-fp16.mlmodelc/metadata.json",
-      "size": 3584,
-      "digest": "a73408c029eeacdc81b20159d55bd1107a904596"
-    },
-    {
-      "path": "Flow-N250-fp16.mlmodelc/model.mil",
-      "size": 5068977,
-      "digest": "22b185d12c4ab42e0dbaa60ded031c2c343c6de6"
-    },
-    {
-      "path": "Flow-N250-fp16.mlmodelc/weights/weight.bin",
-      "size": 664579200,
-      "digest": "8ff4749144aecc55b175d7c1dcfa6f1d719c2b9a5b70fea76a1d3e7691b1ef30"
-    },
-    {
       "path": "HiFT-T500-fp16.mlmodelc/analytics/coremldata.bin",
       "size": 243,
       "digest": "d62418181d6824d86adf8345d29346f6f334751a785f00b895d90c609cfa7830"
@@ -130,6 +105,30 @@
       "path": "voices/cosyvoice3-default-zh.safetensors",
       "size": 57244,
       "digest": "b3486fa47b1f36ca647b41592affb32d37914927161e8ce1f286107e4422e86b"
+    },
+    {
+      "path": "Flow-N250-fp32.mlmodelc/analytics/coremldata.bin",
+      "install_path": "Flow-N250-fp16.mlmodelc/analytics/coremldata.bin",
+      "size": 243,
+      "digest": "098b273f0b0891822792c749e1d71fa660a7501a57f38e1c05f55486075f84b6"
+    },
+    {
+      "path": "Flow-N250-fp32.mlmodelc/coremldata.bin",
+      "install_path": "Flow-N250-fp16.mlmodelc/coremldata.bin",
+      "size": 491,
+      "digest": "1f3fec3b119e5324229c04c10c7da66db7b1de7ea9b16d99b5124ac2fa129a8c"
+    },
+    {
+      "path": "Flow-N250-fp32.mlmodelc/model.mil",
+      "install_path": "Flow-N250-fp16.mlmodelc/model.mil",
+      "size": 4365360,
+      "digest": "5c56f5ad5636b63cdd3d44d1509953715233ff8f"
+    },
+    {
+      "path": "Flow-N250-fp32.mlmodelc/weights/weight.bin",
+      "install_path": "Flow-N250-fp16.mlmodelc/weights/weight.bin",
+      "size": 1329136000,
+      "digest": "429480f1c2a509c2f3f612e679b113943d482409a3a4eb00fcafb95fc23b4d4c"
     }
   ]
 }

@@ -29,6 +29,8 @@ actor CosyVoice {
         let samples = result.samples
         guard !samples.isEmpty, samples.allSatisfy({ $0.isFinite }),
               samples.contains(where: { abs($0) > 0.0001 }) else {
+            let finite = samples.filter { $0.isFinite }.count
+            print("Invalid PCM: tokens=\(result.generatedTokenCount), samples=\(samples.count), finite=\(finite)")
             throw NSError(domain: "TingX", code: 1, userInfo: [NSLocalizedDescriptionKey: "语音引擎未生成有效声音。"])
         }
         var wav = Data("RIFF".utf8)

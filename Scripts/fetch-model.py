@@ -12,7 +12,8 @@ base = "https://huggingface.co/FluidInference/CosyVoice3-0.5B-coreml/resolve/" +
 
 
 def fetch(entry):
-    target = root / entry["path"]
+    # The pinned runtime looks up Flow under a fixed directory name.
+    target = root / entry.get("install_path", entry["path"])
     target.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(["curl", "--fail", "--location", "--silent", "--show-error",
                     "--retry", "4", "--output", str(target), base + "/" + entry["path"]], check=True)
