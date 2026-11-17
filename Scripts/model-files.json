@@ -1,0 +1,135 @@
+{
+  "revision": "b3ce34bd5be2340796e3e1bc1ca55145a5482890",
+  "files": [
+    {
+      "path": "Flow-N250-fp16.mlmodelc/analytics/coremldata.bin",
+      "size": 243,
+      "digest": "284d3e102c55d68802a44985f987e70546706cc3331506a7919610672a0c02e9"
+    },
+    {
+      "path": "Flow-N250-fp16.mlmodelc/coremldata.bin",
+      "size": 491,
+      "digest": "26bb56ba0063c0938eb7329bb264d50ce9a23a88a54ddf7644bc6688d636ad8c"
+    },
+    {
+      "path": "Flow-N250-fp16.mlmodelc/metadata.json",
+      "size": 3584,
+      "digest": "a73408c029eeacdc81b20159d55bd1107a904596"
+    },
+    {
+      "path": "Flow-N250-fp16.mlmodelc/model.mil",
+      "size": 5068977,
+      "digest": "22b185d12c4ab42e0dbaa60ded031c2c343c6de6"
+    },
+    {
+      "path": "Flow-N250-fp16.mlmodelc/weights/weight.bin",
+      "size": 664579200,
+      "digest": "8ff4749144aecc55b175d7c1dcfa6f1d719c2b9a5b70fea76a1d3e7691b1ef30"
+    },
+    {
+      "path": "HiFT-T500-fp16.mlmodelc/analytics/coremldata.bin",
+      "size": 243,
+      "digest": "d62418181d6824d86adf8345d29346f6f334751a785f00b895d90c609cfa7830"
+    },
+    {
+      "path": "HiFT-T500-fp16.mlmodelc/coremldata.bin",
+      "size": 436,
+      "digest": "ef50842cece141ff17df5420ab0ab6daecf456e58509c2c35877989e52fc9bea"
+    },
+    {
+      "path": "HiFT-T500-fp16.mlmodelc/model.mil",
+      "size": 376582,
+      "digest": "4a079db483bc31aac82575798fac7011a7e839c4"
+    },
+    {
+      "path": "HiFT-T500-fp16.mlmodelc/weights/weight.bin",
+      "size": 46124000,
+      "digest": "17b8e2bb0a67be7c1e67fdf3cad23741b5cf353461173918040dc4d3bd8c6519"
+    },
+    {
+      "path": "LLM-Decode-M768-fp16.mlmodelc/analytics/coremldata.bin",
+      "size": 243,
+      "digest": "618f3e003e54e6455bf498e6947f7a3c26d17d86005b0947f907b24a629fa1cd"
+    },
+    {
+      "path": "LLM-Decode-M768-fp16.mlmodelc/coremldata.bin",
+      "size": 514,
+      "digest": "c55086879450735729e18522b2d229a9ecd4b81bd5357997336788cb1dc6e513"
+    },
+    {
+      "path": "LLM-Decode-M768-fp16.mlmodelc/model.mil",
+      "size": 691758,
+      "digest": "7728c1f71e238ef29111b6a236eca8e06d7daaae"
+    },
+    {
+      "path": "LLM-Decode-M768-fp16.mlmodelc/weights/weight.bin",
+      "size": 727959122,
+      "digest": "cd3d0286f7645d10aedafaf3033d68412d2bd53828ff084c3322920d00efec27"
+    },
+    {
+      "path": "LLM-Prefill-T256-M768-fp16.mlmodelc/analytics/coremldata.bin",
+      "size": 243,
+      "digest": "3c8f5a18e2ca38e70ec09bb926989bf110ee28ca9486303e8498c87d9a51fdc5"
+    },
+    {
+      "path": "LLM-Prefill-T256-M768-fp16.mlmodelc/coremldata.bin",
+      "size": 492,
+      "digest": "029e60d0af895b8ae43d3277707f0288dafd3397f1a1f92aa034aa327de65f17"
+    },
+    {
+      "path": "LLM-Prefill-T256-M768-fp16.mlmodelc/model.mil",
+      "size": 1064973,
+      "digest": "8c8a8a0348451d96795934c6708e5df91050eb10"
+    },
+    {
+      "path": "LLM-Prefill-T256-M768-fp16.mlmodelc/weights/weight.bin",
+      "size": 728414866,
+      "digest": "d8f8cd89961a52aa583fc988de9c35ceee556dbfc4a1f1329a608e10086b4606"
+    },
+    {
+      "path": "README.md",
+      "size": 4372,
+      "digest": "d971590200bcb568c0ebca8e83988feff2161016"
+    },
+    {
+      "path": "embeddings/embeddings-runtime-fp32.safetensors",
+      "size": 568770400,
+      "digest": "143f2698c0be3c3ef66e6e172899f1c2f99011169c405fe8d9925dff1df93203"
+    },
+    {
+      "path": "embeddings/speech_embedding-fp16.safetensors",
+      "size": 12115808,
+      "digest": "9ed70f85074a2625eb86fb38c09c13b6c4ba87b48b92f345a38a8b97b48aabc1"
+    },
+    {
+      "path": "tokenizer/merges.txt",
+      "size": 1402109,
+      "digest": "90d3d82d027eadcc6a5e77c38eb82d43fc51b53b"
+    },
+    {
+      "path": "tokenizer/special_tokens.json",
+      "size": 5364,
+      "digest": "51568aee69d16f57fe8ab8a1e00923e5fdcdb142"
+    },
+    {
+      "path": "tokenizer/tokenizer_config.json",
+      "size": 1287,
+      "digest": "ff55d7b9eb1384e5d4d7e75dc0f564c1a8833d6e"
+    },
+    {
+      "path": "tokenizer/vocab.json",
+      "size": 2776833,
+      "digest": "4783fe10ac3adce15ac8f358ef5462739852c569"
+    },
+    {
+      "path": "voices/cosyvoice3-default-zh.json",
+      "size": 111,
+      "digest": "324a429df992962ed050728c88eca6c86daed575"
+    },
+    {
+      "path": "voices/cosyvoice3-default-zh.safetensors",
+      "size": 57244,
+      "digest": "b3486fa47b1f36ca647b41592affb32d37914927161e8ce1f286107e4422e86b"
+    }
+  ]
+}

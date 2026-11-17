@@ -47,7 +47,7 @@ enum ListeningBook {
         for character in body {
             buffer.append(character)
             count += 1
-            if count == 160 || "。！？!?\n".contains(character) {
+            if count == 32 || "。！？!?；;\n".contains(character) {
                 try Task.checkCancellation()
                 let piece = buffer.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !piece.isEmpty { segments.append(piece) }

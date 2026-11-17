@@ -9,7 +9,7 @@ concurrency:
 jobs:
   build:
     runs-on: macos-15
-    timeout-minutes: 30
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@v4
       - name: Install XcodeGen
@@ -29,20 +29,34 @@ jobs:
         run: |
           set -o pipefail
           xcodebuild -project TingX.xcodeproj -scheme TingX -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath DeviceBuild CODE_SIGNING_ALLOWED=NO build | tee device.log
+      - name: Fetch and verify bundled Mandarin voice
+        run: python3 Scripts/fetch-model.py DeviceBuild/Build/Products/Release-iphoneos/TingX.app/CosyVoice3
       - name: Package unsigned IPA
         run: |
           mkdir -p package/Payload
-          cp -R DeviceBuild/Build/Products/Release-iphoneos/TingX.app package/Payload/
-          cd package && zip -qr ../TingX-unsigned.ipa Payload
+          mv DeviceBuild/Build/Products/Release-iphoneos/TingX.app package/Payload/
+          cd package && zip -q -1 -r ../TingX-unsigned.ipa Payload
       - uses: actions/upload-artifact@v4
         with:
           name: TingX-unsigned
           path: TingX-unsigned.ipa
+          compression-level: 0
+      - name: Synthesize Mandarin with packaged assets
+        timeout-minutes: 10
+        run: |
+          set -o pipefail
+          xcodebuild -project TingX.xcodeproj -scheme VoiceCheck -configuration Release -destination 'platform=macOS' -derivedDataPath CheckBuild CODE_SIGNING_ALLOWED=NO build | tee voice-check.log
+          CheckBuild/Build/Products/Release/VoiceCheck package/Payload/TingX.app/CosyVoice3 2>&1 | tee -a voice-check.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CosyVoice3-sample
+          path: cosyvoice-check.wav
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: TingX-build-logs
           path: |
+            voice-check.log
             checks.log
             simulator.log
             device.log

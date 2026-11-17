@@ -89,7 +89,7 @@ struct RootView: View {
                     .font(.title2.bold()).lineLimit(2).multilineTextAlignment(.center)
                 Text(library.selected == nil ? "支持本地 EPUB / TXT" : (narrator.loading ? "正在读取正文…" : narrator.titles.indices.contains(narrator.chapter) ? narrator.titles[narrator.chapter] : "暂无章节"))
                     .font(.subheadline).foregroundStyle(TingTheme.muted)
-                Text(narrator.finished ? "已听完" : (narrator.pieces.indices.contains(narrator.segment) ? narrator.pieces[narrator.segment] : " ")).lineLimit(2).font(.subheadline.weight(.medium)).padding(.top, 4)
+                Text(narrator.preparing ? "正在本机合成语音…" : narrator.finished ? "已听完" : (narrator.pieces.indices.contains(narrator.segment) ? narrator.pieces[narrator.segment] : " ")).lineLimit(2).font(.subheadline.weight(.medium)).padding(.top, 4)
             }
             .frame(maxWidth: .infinity)
 
@@ -286,7 +286,7 @@ struct RootView: View {
             Form {
                 Section("TingX") {
                     LabeledContent("本地书籍", value: "\(library.books.count) 本")
-                    LabeledContent("语音引擎", value: "iOS 本地中文语音")
+                    LabeledContent("语音引擎", value: "CosyVoice 3 · 离线中文")
                 }
                 Section("隐私") {
                     Text("仅使用本地导入文件，不需要账号、云同步或在线书城。")

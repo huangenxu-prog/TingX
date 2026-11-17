@@ -2,7 +2,7 @@ import AVFoundation
 import Combine
 
 @MainActor
-final class Narrator: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
+final class Narrator: NSObject, ObservableObject, AVAudioPlayerDelegate {
     @Published private(set) var titles: [String] = []
     @Published private(set) var chapter = 0
     @Published private(set) var segment = 0
@@ -15,8 +15,10 @@ final class Narrator: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
 
     private weak var library: AudioLibrary?
     private var bookID: UUID?
-    private let synth = AVSpeechSynthesizer()
-    private var utterance: AVSpeechUtterance?
+    private let voice = CosyVoice(directory: Bundle.main.bundleURL.appendingPathComponent("CosyVoice3"))
+    private var player: AVAudioPlayer?
+    private var synthesis: Task<Void, Never>?
+    @Published private(set) var preparing = false
     private var document: ListeningBook?
     private var generation = UUID()
     private var timer: Task<Void, Never>?
@@ -26,7 +28,6 @@ final class Narrator: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
     override init() {
         super.init()
         if speed <= 0 { speed = 1 }
-        synth.delegate = self
         NotificationCenter.default.addObserver(self, selector: #selector(interruption(_:)),
             name: AVAudioSession.interruptionNotification, object: nil)
     }
@@ -120,8 +121,10 @@ final class Narrator: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
 
     func pause() {
         resumeAfterLoad = false
-        utterance = nil
-        synth.stopSpeaking(at: .immediate)
+        synthesis?.cancel()
+        player?.stop()
+        player = nil
+        preparing = false
         playing = false
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
@@ -138,17 +141,32 @@ final class Narrator: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
     }
 
     private func enqueue() {
-        let next = AVSpeechUtterance(string: pieces[segment])
-        next.voice = AVSpeechSynthesisVoice(language: "zh-CN")
-        next.rate = AVSpeechUtteranceDefaultSpeechRate * Float(speed)
-        utterance = next
+        let text = pieces[segment]
         playing = true
-        synth.speak(next)
+        preparing = true
+        synthesis = Task {
+            do {
+                let data = try await voice.audio(for: text)
+                try Task.checkCancellation()
+                let audio = try AVAudioPlayer(data: data)
+                audio.delegate = self
+                audio.enableRate = true
+                audio.rate = Float(speed)
+                player = audio
+                preparing = false
+                guard audio.play() else { throw CocoaError(.fileReadUnknown) }
+            } catch {
+                guard !Task.isCancelled else { return }
+                pause()
+                library?.errorMessage = "离线语音合成或播放失败：\(error.localizedDescription)"
+            }
+        }
     }
 
-    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+    nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
         Task { @MainActor in
-            guard self.utterance === utterance, self.bookID == self.library?.selectedID else { return }
+            guard self.player === player, self.bookID == self.library?.selectedID else { return }
+            guard flag else { self.pause(); self.library?.errorMessage = "本段播放中断。"; return }
             if self.segment + 1 < self.pieces.count {
                 self.segment += 1
                 self.save()
@@ -176,7 +194,7 @@ final class Narrator: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
     func changeSpeed() {
         speed = speed >= 1.5 ? 0.8 : (speed * 10 + 1).rounded() / 10
         UserDefaults.standard.set(speed, forKey: "narrationSpeed")
-        if playing { pause(); speak() }
+        player?.rate = Float(speed)
     }
 
     func cycleTimer() {

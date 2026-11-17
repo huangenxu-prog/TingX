@@ -2,6 +2,9 @@ name: TingX
 options:
   bundleIdPrefix: com.huangenxu
 packages:
+  FluidAudio:
+    url: https://github.com/FluidInference/FluidAudio
+    revision: c60d13a0d585d204d1d3fbe85aa7a36c731800d6
   ZIPFoundation:
     url: https://github.com/weichsel/ZIPFoundation
     exactVersion: 0.9.20
@@ -14,6 +17,7 @@ targets:
       - path: TingX
     dependencies:
       - package: ZIPFoundation
+      - package: FluidAudio
     info:
       path: Generated/Info.plist
       properties:
@@ -38,3 +42,12 @@ targets:
       - path: TingX/ListeningBook.swift
     dependencies:
       - package: ZIPFoundation
+  VoiceCheck:
+    type: tool
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: Tests/Voice/main.swift
+      - path: TingX/CosyVoice.swift
+    dependencies:
+      - package: FluidAudio
