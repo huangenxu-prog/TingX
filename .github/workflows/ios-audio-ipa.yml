@@ -1,6 +1,10 @@
 name: TingX unsigned experimental IPA
 on:
   workflow_dispatch:
+  push:
+    branches: [experiment/audio-pipeline]
+    paths:
+      - '.github/workflows/ios-audio-ipa.yml'
 jobs:
   unsigned-ipa:
     runs-on: macos-15
@@ -14,7 +18,7 @@ jobs:
       - name: Generate missing iOS runner
         run: |
           if [ ! -f ios/Runner.xcodeproj/project.pbxproj ]; then
-            flutter create --platforms=ios --project-name tingx .
+            bash tool/prepare_ios.sh
           fi
       - name: Resolve dependencies
         run: flutter pub get
