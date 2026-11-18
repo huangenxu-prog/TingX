@@ -12,11 +12,15 @@ class BiliStreamAudioSource extends StreamAudioSource {
     required this.uri,
     required this.referer,
     required this.userAgent,
+    this.trackId = 0,
+    this.bandwidth = 0,
   });
 
   final Uri uri;
   final String referer;
   final String userAgent;
+  final int trackId;
+  final int bandwidth;
 
   @override
   Future<StreamAudioResponse> request([int? start, int? end]) async {

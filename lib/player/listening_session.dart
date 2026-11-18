@@ -34,44 +34,73 @@ class ListeningSession extends BaseAudioHandler {
         return b.bandwidth.compareTo(a.bandwidth);
       });
 
-    final urls = <String>{};
-    void addUrls(String primary, List<String> backups) {
-      for (final raw in [primary, ...backups]) {
-        if (raw.startsWith('https://')) {
-          urls.add(raw);
-        } else if (raw.startsWith('http://')) {
-          urls.add(raw.replaceFirst('http://', 'https://'));
-        }
+    final urls = <String, BiliStreamAudioSource>{};
+    final ordered = [
+      ...tracks,
+      if (result.dolby != null) result.dolby!,
+      if (result.flac != null) result.flac!,
+    ];
+    void add(String raw, int id, int bandwidth) {
+      final uri = Uri.tryParse(raw);
+      if (uri == null || uri.host.isEmpty ||
+          (uri.scheme != 'http' && uri.scheme != 'https')) return;
+      final https = uri.replace(scheme: 'https');
+      urls.putIfAbsent(https.toString(), () => BiliStreamAudioSource(
+        uri: https,
+        referer: BiliEndpoints.home,
+        userAgent: BiliEndpoints.userAgent,
+        trackId: id,
+        bandwidth: bandwidth,
+      ));
+    }
+
+    // Give a different ordinary track a chance before mirrors of track one.
+    for (final track in tracks) {
+      add(track.baseUrl, track.id, track.bandwidth);
+    }
+    for (final track in ordered) {
+      add(track.baseUrl, track.id, track.bandwidth);
+      for (final backup in track.backupUrls) {
+        add(backup, track.id, track.bandwidth);
       }
     }
-
-    for (final track in tracks) {
-      addUrls(track.baseUrl, track.backupUrls);
-    }
-    if (result.dolby != null) {
-      addUrls(result.dolby!.baseUrl, result.dolby!.backupUrls);
-    }
-    if (result.flac != null) {
-      addUrls(result.flac!.baseUrl, result.flac!.backupUrls);
-    }
-
     return [
-      for (final url in urls)
-        if (experimentalStream)
-          BiliStreamAudioSource(
-            uri: Uri.parse(url),
-            referer: BiliEndpoints.home,
-            userAgent: BiliEndpoints.userAgent,
-          )
-        else
-          AudioSource.uri(
-            Uri.parse(url),
-            headers: const {
-              'Referer': BiliEndpoints.home,
-              'User-Agent': BiliEndpoints.userAgent,
-            },
-          ),
+      for (final source in urls.values)
+        if (experimentalStream) source else AudioSource.uri(source.uri,
+          headers: const {'Referer': BiliEndpoints.home,
+                          'User-Agent': BiliEndpoints.userAgent}),
     ];
+  }
+
+  ({String bvid, int cid, DateTime at, Future<List<AudioSource>> sources})? _next;
+
+  void _prefetchNext() {
+    final next = chapters.elementAtOrNull(index + 1);
+    final currentBook = book;
+    if (next == null || currentBook == null) return;
+    final pending = chapterSources(currentBook.bvid, next.cid)
+        .timeout(const Duration(seconds: 12))
+        .catchError((Object _) => <AudioSource>[]);
+    _next = (bvid: currentBook.bvid, cid: next.cid,
+             at: DateTime.now(), sources: pending);
+  }
+
+  Future<List<AudioSource>> _takeSources(String bvid, int cid) async {
+    final cached = _next;
+    _next = null;
+    if (cached != null && cached.bvid == bvid && cached.cid == cid &&
+        DateTime.now().difference(cached.at) < const Duration(hours: 2)) {
+      final items = await cached.sources;
+      final now = DateTime.now();
+      final valid = items.where((s) {
+        final uri = s is BiliStreamAudioSource ? s.uri : s is UriAudioSource ? s.uri : null;
+        final expiry = int.tryParse(uri?.queryParameters['deadline'] ?? '');
+        return expiry == null ? now.difference(cached.at) < const Duration(minutes: 10)
+            : expiry > now.millisecondsSinceEpoch ~/ 1000 + 60;
+      }).toList();
+      if (valid.isNotEmpty) return valid;
+    }
+    return chapterSources(bvid, cid).timeout(const Duration(seconds: 12));
   }
 
   // just_audio sends custom Referer/User-Agent headers through its local
@@ -204,14 +233,19 @@ class ListeningSession extends BaseAudioHandler {
       // Never retry indefinitely or skip the chapter silently.
       Future<String>? firstProbe;
       Object? lastError;
+      final attempted = <Uri>{};
+      final attempts = <String>[];
       var opened = false;
       for (var refresh = 0; refresh < 2 && !opened; refresh++) {
         if (refresh > 0) {
           await Future<void>.delayed(const Duration(milliseconds: 500));
         }
         final sourceClock = Stopwatch()..start();
-        final sources = await chapterSources(selected.bvid, current.cid)
-            .timeout(const Duration(seconds: 12));
+        final fetched = await _takeSources(selected.bvid, current.cid);
+        final sources = [
+          ...fetched.where((s) => s is! BiliStreamAudioSource || !attempted.contains(s.uri)),
+          ...fetched.whereType<BiliStreamAudioSource>().where((s) => attempted.contains(s.uri)),
+        ];
         debugPrint('[TingX] source lookup: cid=${current.cid}, '
             'attempt=$refresh, elapsed=${sourceClock.elapsedMilliseconds}ms, '
             'candidates=${sources.length}');
@@ -221,6 +255,7 @@ class ListeningSession extends BaseAudioHandler {
             candidate < sources.length && candidate < 2;
             candidate++) {
           final source = sources[candidate];
+          if (source is BiliStreamAudioSource) attempted.add(source.uri);
           final loadClock = Stopwatch()..start();
           try {
             final timeout = experimentalStream && candidate == 0 && refresh == 0
@@ -236,6 +271,9 @@ class ListeningSession extends BaseAudioHandler {
             break;
           } catch (e) {
             lastError = e;
+            if (source is BiliStreamAudioSource) {
+              attempts.add('${source.trackId}/${source.bandwidth ~/ 1000}k ${loadClock.elapsedMilliseconds}ms');
+            }
             if (candidate == 0 && refresh == 0) {
               firstProbe = _diagnoseSource(source);
             }
@@ -254,7 +292,7 @@ class ListeningSession extends BaseAudioHandler {
         await audio.stop();
         final probe = await firstProbe ?? '';
         throw StateError('本章音源加载失败（${selected.bvid} / ${current.cid}）：'
-            '$lastError${probe.isEmpty ? "" : "\\n$probe"}');
+            '$lastError\n${attempts.join(" → ")}\n$probe');
       }
       mediaItem.add(
         MediaItem(
@@ -271,6 +309,7 @@ class ListeningSession extends BaseAudioHandler {
       ready = true;
       await save();
       await _startPlayback();
+      _prefetchNext();
       debugPrint('[TingX] startup ready: cid=${current.cid}, '
           'elapsed=${startupClock.elapsedMilliseconds}ms');
     } catch (e) {
