@@ -4,6 +4,7 @@ on:
   push:
     branches: [experiment/audio-pipeline]
     paths:
+      - 'lib/player/**'
       - '.github/workflows/ios-audio-ipa.yml'
 jobs:
   unsigned-ipa:

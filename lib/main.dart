@@ -149,7 +149,8 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
         StreamBuilder<Duration>(
           stream: player.audio.positionStream,
           builder: (_, snapshot) {
-            final total = player.audio.duration?.inSeconds ?? 0;
+            final duration = player.audio.duration?.inSeconds ?? 0;
+            final total = duration > 0 ? duration : (player.chapter?.duration ?? 0);
             final pos = (snapshot.data ?? Duration.zero).inSeconds.clamp(
               0,
               total,
@@ -159,7 +160,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
                 Slider(
                   value: pos.toDouble(),
                   max: total > 0 ? total.toDouble() : 1,
-                  onChanged: player.ready
+                  onChanged: player.ready && duration > 0
                       ? (v) => player.seek(Duration(seconds: v.round()))
                       : null,
                 ),

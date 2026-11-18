@@ -80,26 +80,26 @@ class ListeningSession extends BaseAudioHandler {
 
   // Diagnose the CDN response without logging expiring signed URLs.
   // Only runs after a playback failure, never on the successful fast path.
-  Future<void> _diagnoseSource(AudioSource source) async {
-    if (source is! UriAudioSource) return;
-    final client = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 4);
+  Future<String> _diagnoseSource(AudioSource source) async {
+    final uri = switch (source) {
+      BiliStreamAudioSource s => s.uri,
+      UriAudioSource s => s.uri,
+      _ => null,
+    };
+    if (uri == null) return '';
+    final client = HttpClient()..connectionTimeout = const Duration(seconds: 4);
     try {
-      final request = await client.getUrl(source.uri)
-          .timeout(const Duration(seconds: 4));
-      request.headers.set(HttpHeaders.refererHeader, BiliEndpoints.home);
-      request.headers.set(HttpHeaders.userAgentHeader, BiliEndpoints.userAgent);
-      request.headers.set(HttpHeaders.rangeHeader, 'bytes=0-1023');
-      final response = await request.close()
-          .timeout(const Duration(seconds: 4));
-      debugPrint('[TingX] CDN diagnostic: host=${source.uri.host}, '
-          'status=${response.statusCode}, '
-          'contentType=${response.headers.contentType}, '
-          'range=${response.headers.value(HttpHeaders.contentRangeHeader)}');
-      await response.drain<void>().timeout(const Duration(seconds: 4));
+      return await (() async {
+        final request = await client.getUrl(uri);
+        request.headers.set(HttpHeaders.refererHeader, BiliEndpoints.home);
+        request.headers.set(HttpHeaders.userAgentHeader, BiliEndpoints.userAgent);
+        request.headers.set(HttpHeaders.rangeHeader, 'bytes=0-1023');
+        final response = await request.close();
+        final range = response.headers.value(HttpHeaders.contentRangeHeader);
+        return '首选地址探测 ${uri.host} HTTP ${response.statusCode}，Range ${range ?? "无"}';
+      })().timeout(const Duration(seconds: 4));
     } catch (e) {
-      debugPrint('[TingX] CDN diagnostic failed: '
-          'host=${source.uri.host}, error=$e');
+      return '首选地址探测 ${uri.host}，${e.runtimeType}';
     } finally {
       client.close(force: true);
     }
@@ -202,6 +202,7 @@ class ListeningSession extends BaseAudioHandler {
       // Bilibili DASH URLs can be signed and short-lived. If every CDN
       // endpoint fails, request fresh addresses once before showing an error.
       // Never retry indefinitely or skip the chapter silently.
+      Future<String>? firstProbe;
       Object? lastError;
       var opened = false;
       for (var refresh = 0; refresh < 2 && !opened; refresh++) {
@@ -222,10 +223,13 @@ class ListeningSession extends BaseAudioHandler {
           final source = sources[candidate];
           final loadClock = Stopwatch()..start();
           try {
+            final timeout = experimentalStream && candidate == 0 && refresh == 0
+                ? const Duration(seconds: 15)
+                : const Duration(seconds: 5);
             await audio.setAudioSource(
               source,
               initialPosition: Duration(milliseconds: offset),
-            ).timeout(const Duration(seconds: 5));
+            ).timeout(timeout);
             debugPrint('[TingX] source opened: cid=${current.cid}, '
                 'candidate=$candidate, elapsed=${loadClock.elapsedMilliseconds}ms');
             opened = true;
@@ -233,7 +237,7 @@ class ListeningSession extends BaseAudioHandler {
           } catch (e) {
             lastError = e;
             if (candidate == 0 && refresh == 0) {
-              unawaited(_diagnoseSource(source));
+              firstProbe = _diagnoseSource(source);
             }
             debugPrint(
               '[TingX] audio open failed: chapter=${current.cid}, '
@@ -247,7 +251,10 @@ class ListeningSession extends BaseAudioHandler {
         }
       }
       if (!opened) {
-        throw StateError('全部音轨与备用地址均无法打开：$lastError');
+        await audio.stop();
+        final probe = await firstProbe ?? '';
+        throw StateError('本章音源加载失败（${selected.bvid} / ${current.cid}）：'
+            '$lastError${probe.isEmpty ? "" : "\\n$probe"}');
       }
       mediaItem.add(
         MediaItem(
