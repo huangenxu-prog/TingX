@@ -399,6 +399,56 @@ class _DetailState extends State<Detail> {
         ));
         return Column(
           children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(width: 84, height: 112, child: cover(b)),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(b.cleanTitle,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleMedium),
+                        const SizedBox(height: 6),
+                        Text(b.author, maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                        const SizedBox(height: 8),
+                        Text('共 ${parts.length} 章',
+                          style: Theme.of(context).textTheme.bodySmall),
+                        TextButton.icon(
+                          onPressed: () async {
+                            if (ShelfStore.instance.isOnShelf(b.bvid)) {
+                              await ShelfStore.instance.remove(b.bvid);
+                            } else {
+                              await ShelfStore.instance.add(b);
+                              await ShelfStore.instance.setTotalChapters(
+                                b.bvid, parts.length);
+                            }
+                            if (mounted) setState(() {});
+                          },
+                          icon: Icon(ShelfStore.instance.isOnShelf(b.bvid)
+                            ? Icons.bookmark_remove_outlined
+                            : Icons.bookmark_add_outlined),
+                          label: Text(ShelfStore.instance.isOnShelf(b.bvid)
+                            ? '移出书架' : '加入书架'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (b.desc.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Text(b.desc, maxLines: 3,
+                  overflow: TextOverflow.ellipsis),
+              ),
             FilledButton.tonal(
               onPressed: () => choose(last < 0 ? 0 : last),
               child: Text(
