@@ -26,7 +26,7 @@ class _DiscoverHomeState extends State<DiscoverHome> {
   bool searching = false;
   String? error;
   String? keyword;
-  int offset = 0;
+  final Map<String, int> sectionOffsets = {};
   int generation = 0;
 
   @override
@@ -81,9 +81,9 @@ class _DiscoverHomeState extends State<DiscoverHome> {
     }
   }
 
-  List<Book> batch(List<Book> source, [int shift = 0]) {
+  List<Book> batch(String title, List<Book> source) {
     if (source.isEmpty) return [];
-    final start = (offset + shift) % source.length;
+    final start = (sectionOffsets[title] ?? 0) % source.length;
     return List.generate(source.length < 6 ? source.length : 6,
         (i) => source[(start + i) % source.length]);
   }
@@ -108,14 +108,16 @@ class _DiscoverHomeState extends State<DiscoverHome> {
     ]),
   );
 
-  Widget section(String title, List<Book> books, {bool shuffle = true}) => Column(
+  Widget section(String title, List<Book> source, {bool shuffle = true}) {
+    final books = batch(title, source);
+    return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
         Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-        if (shuffle && books.length > 6)
+        if (shuffle && source.length > 6)
           TextButton.icon(
-            onPressed: () => setState(() => offset += 6),
+            onPressed: () => setState(() => sectionOffsets[title] = (sectionOffsets[title] ?? 0) + 6),
             icon: const Icon(Icons.refresh, size: 16),
             label: const Text('换一批'),
           ),
@@ -136,13 +138,14 @@ class _DiscoverHomeState extends State<DiscoverHome> {
       const SizedBox(height: 14),
     ],
   );
+  }
 
   Widget categoryStrip() => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       const Text('分类', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
       const SizedBox(height: 10),
-      SizedBox(height: 94, child: PageView.builder(
+      SizedBox(height: 112, child: PageView.builder(
         itemCount: (categories.length / 8).ceil(),
         itemBuilder: (_, page) => GridView.count(
           physics: const NeverScrollableScrollPhysics(),
@@ -189,11 +192,11 @@ class _DiscoverHomeState extends State<DiscoverHome> {
       if (keyword != null)
         section('搜索结果', results, shuffle: false)
       else ...[
-        section('热门推荐', batch(hot)),
+        section('热门推荐', hot),
         categoryStrip(),
-        section('收藏榜', batch(byFavorite.where((b) => b.favorite > 0).toList())),
-        section('热播榜', batch(hot)),
-        section('高赞榜', batch(byLike.where((b) => b.like > 0).toList())),
+        section('收藏榜', byFavorite.where((b) => b.favorite > 0).toList()),
+        section('热播榜', hot),
+        section('高赞榜', byLike.where((b) => b.like > 0).toList()),
         TextButton(onPressed: refresh, child: const Text('刷新推荐')),
       ],
     ]);
