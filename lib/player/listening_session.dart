@@ -14,8 +14,7 @@ import '../services/bili_api.dart';
 import 'bili_stream_audio_source.dart';
 
 class ListeningSession extends BaseAudioHandler {
-  // Opt-in only: flutter build ... --dart-define=TINGX_EXPERIMENTAL_STREAM=true
-  // The production default remains the original URI playback path.
+  // Experimental builds retain the same-source engine comparison.
   static const experimentalStream =
       bool.fromEnvironment('TINGX_EXPERIMENTAL_STREAM');
   ListeningSession({this.chapterSources = onlineSources});
@@ -24,7 +23,7 @@ class ListeningSession extends BaseAudioHandler {
   static Future<List<BiliStreamAudioSource>> onlineSources(String bvid, int cid) async {
     final result = await BiliApi.instance.playUrl(bvid, cid);
 
-    // iOS AVPlayer supports AAC/MP4 most reliably. Try ordinary DASH
+    // Preserve the existing source preference. Try ordinary DASH
     // audio first; Dolby/FLAC are fallback only, not the default.
     final tracks = [...result.tracks]
       ..sort((a, b) {
