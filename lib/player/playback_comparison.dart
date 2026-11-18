@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:media_kit/media_kit.dart' as mk;
 
-import 'bili_stream_audio_source.dart';
 import 'listening_session.dart';
 
 bool _mediaKitFirst = false;
@@ -25,12 +24,12 @@ Future<void> comparePlayback(BuildContext context, ListeningSession session) asy
       await session.pause();
       final sources = await ListeningSession.onlineSources(book.bvid, chapter.cid)
           .timeout(const Duration(seconds: 15));
-      final source = sources.whereType<BiliStreamAudioSource>().first;
+      final source = sources.first;
       line('音轨 ${source.trackId} · ${source.uri.host}');
       final order = [_mediaKitFirst, !_mediaKitFirst];
       _mediaKitFirst = !_mediaKitFirst;
       for (final useKit in order) {
-        final name = useKit ? 'media_kit' : '当前播放器';
+        final name = useKit ? 'media_kit' : 'just_audio';
         line('正在测试 $name…');
         mk.Player? kit;
         AudioPlayer? current;

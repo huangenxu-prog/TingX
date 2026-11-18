@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
+import 'package:media_kit/media_kit.dart' show MediaKit;
 
 import 'core/network/bili_client.dart';
 import 'core/storage/shelf_store.dart';
@@ -15,6 +16,7 @@ import 'services/bili_api.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  MediaKit.ensureInitialized();
   await Future.wait([
     BiliClient.instance.initLocal(),
     ShelfStore.instance.load(),
@@ -148,9 +150,9 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
         if (player.error != null && b != null)
           TextButton(onPressed: () => details(b), child: const Text('重新选择章节')),
         StreamBuilder<Duration>(
-          stream: player.audio.positionStream,
+          stream: player.audio.stream.position,
           builder: (_, snapshot) {
-            final duration = player.audio.duration?.inSeconds ?? 0;
+            final duration = player.audio.state.duration.inSeconds;
             final total = duration > 0 ? duration : (player.chapter?.duration ?? 0);
             final pos = (snapshot.data ?? Duration.zero).inSeconds.clamp(
               0,
@@ -180,11 +182,11 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
             ),
             TextButton(onPressed: player.rewind, child: const Text('−15s')),
             IconButton.filled(
-              tooltip: player.audio.playing ? '暂停' : '播放',
+              tooltip: player.audio.state.playing ? '暂停' : '播放',
               onPressed: player.ready
-                  ? (player.audio.playing ? player.pause : player.play)
+                  ? (player.audio.state.playing ? player.pause : player.play)
                   : null,
-              icon: Icon(player.audio.playing ? Icons.pause : Icons.play_arrow),
+              icon: Icon(player.audio.state.playing ? Icons.pause : Icons.play_arrow),
             ),
             TextButton(
               onPressed: player.fastForward,
@@ -208,14 +210,14 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
             ),
             PopupMenuButton<double>(
               onSelected: (v) async {
-                await player.audio.setSpeed(v);
+                await player.audio.setRate(v);
                 player.publish();
               },
               itemBuilder: (_) => [
                 for (final n in [0.75, 1.0, 1.25, 1.5, 2.0])
                   PopupMenuItem(value: n, child: Text('${n}×')),
               ],
-              child: Text('${player.audio.speed}×'),
+              child: Text('${player.audio.state.rate}×'),
             ),
             PopupMenuButton<int>(
               onSelected: player.setSleep,

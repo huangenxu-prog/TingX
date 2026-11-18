@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
-import 'package:just_audio/just_audio.dart';
+import 'package:media_kit/media_kit.dart' as mk;
 
 import '../core/network/api_config.dart';
 import '../core/storage/shelf_store.dart';
@@ -19,9 +19,9 @@ class ListeningSession extends BaseAudioHandler {
   static const experimentalStream =
       bool.fromEnvironment('TINGX_EXPERIMENTAL_STREAM');
   ListeningSession({this.chapterSources = onlineSources});
-  final Future<List<AudioSource>> Function(String bvid, int cid) chapterSources;
+  final Future<List<BiliStreamAudioSource>> Function(String bvid, int cid) chapterSources;
 
-  static Future<List<AudioSource>> onlineSources(String bvid, int cid) async {
+  static Future<List<BiliStreamAudioSource>> onlineSources(String bvid, int cid) async {
     final result = await BiliApi.instance.playUrl(bvid, cid);
 
     // iOS AVPlayer supports AAC/MP4 most reliably. Try ordinary DASH
@@ -64,15 +64,10 @@ class ListeningSession extends BaseAudioHandler {
         add(backup, track.id, track.bandwidth);
       }
     }
-    return [
-      for (final source in urls.values)
-        if (experimentalStream) source else AudioSource.uri(source.uri,
-          headers: const {'Referer': BiliEndpoints.home,
-                          'User-Agent': BiliEndpoints.userAgent}),
-    ];
+    return urls.values.toList();
   }
 
-  ({String bvid, int cid, DateTime at, Future<List<AudioSource>> sources})? _next;
+  ({String bvid, int cid, DateTime at, Future<List<BiliStreamAudioSource>> sources})? _next;
 
   void _prefetchNext() {
     final next = chapters.elementAtOrNull(index + 1);
@@ -80,12 +75,12 @@ class ListeningSession extends BaseAudioHandler {
     if (next == null || currentBook == null) return;
     final pending = chapterSources(currentBook.bvid, next.cid)
         .timeout(const Duration(seconds: 12))
-        .catchError((Object _) => <AudioSource>[]);
+        .catchError((Object _) => <BiliStreamAudioSource>[]);
     _next = (bvid: currentBook.bvid, cid: next.cid,
              at: DateTime.now(), sources: pending);
   }
 
-  Future<List<AudioSource>> _takeSources(String bvid, int cid) async {
+  Future<List<BiliStreamAudioSource>> _takeSources(String bvid, int cid) async {
     final cached = _next;
     _next = null;
     if (cached != null && cached.bvid == bvid && cached.cid == cid &&
@@ -93,8 +88,8 @@ class ListeningSession extends BaseAudioHandler {
       final items = await cached.sources;
       final now = DateTime.now();
       final valid = items.where((s) {
-        final uri = s is BiliStreamAudioSource ? s.uri : s is UriAudioSource ? s.uri : null;
-        final expiry = int.tryParse(uri?.queryParameters['deadline'] ?? '');
+        final uri = s.uri;
+        final expiry = int.tryParse(uri.queryParameters['deadline'] ?? '');
         return expiry == null ? now.difference(cached.at) < const Duration(minutes: 10)
             : expiry > now.millisecondsSinceEpoch ~/ 1000 + 60;
       }).toList();
@@ -103,19 +98,31 @@ class ListeningSession extends BaseAudioHandler {
     return chapterSources(bvid, cid).timeout(const Duration(seconds: 12));
   }
 
-  // just_audio sends custom Referer/User-Agent headers through its local
-  // proxy on iOS. Disabling the proxy can cause CDN requests to omit them.
-  final audio = AudioPlayer(useProxyForRequestHeaders: true);
+  final audio = mk.Player();
 
-  // Diagnose the CDN response without logging expiring signed URLs.
-  // Only runs after a playback failure, never on the successful fast path.
-  Future<String> _diagnoseSource(AudioSource source) async {
-    final uri = switch (source) {
-      BiliStreamAudioSource s => s.uri,
-      UriAudioSource s => s.uri,
-      _ => null,
-    };
-    if (uri == null) return '';
+  Future<void> _load(BiliStreamAudioSource source, int offset, Duration timeout) async {
+    final loaded = Completer<void>();
+    final duration = audio.stream.duration.listen((value) {
+      if (value > Duration.zero && !loaded.isCompleted) loaded.complete();
+    });
+    final errors = audio.stream.error.listen((message) {
+      if (!loaded.isCompleted) loaded.completeError(StateError(message));
+    });
+    try {
+      await Future.wait<void>([
+        loaded.future,
+        audio.open(mk.Media(source.uri.toString(),
+          httpHeaders: {'Referer': source.referer, 'User-Agent': source.userAgent},
+          start: Duration(milliseconds: offset)), play: false),
+      ], eagerError: true).timeout(timeout);
+    } finally {
+      await duration.cancel();
+      await errors.cancel();
+    }
+  }
+
+  Future<String> _diagnoseSource(BiliStreamAudioSource source) async {
+    final uri = source.uri;
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 4);
     try {
       return await (() async {
@@ -152,25 +159,26 @@ class ListeningSession extends BaseAudioHandler {
     final session = await AudioSession.instance;
     await session.configure(const AudioSessionConfiguration.speech());
     _audioSession = session;
-    audio.playbackEventStream.listen(
-      (_) {
+    audio.stream.playing.listen((_) => publish());
+    audio.stream.buffering.listen((_) => publish());
+    audio.stream.rate.listen((_) => publish());
+    audio.stream.error.listen((message) {
+      if (ready && !busy) {
+        error = '播放中断：$message';
         publish();
-      },
-      onError: (Object e) {
-        error = '播放中断：$e';
-        revision.value++;
-      },
-    );
-    audio.playerStateStream.listen((state) {
-      if (ready &&
-          !busy &&
-          state.playing &&
-          state.processingState == ProcessingState.completed) {
-        unawaited(finishChapter());
       }
     });
+    audio.stream.completed.listen((completed) {
+      if (completed && ready && !busy) unawaited(finishChapter());
+    });
+    session.becomingNoisyEventStream.listen((_) {
+      if (audio.state.playing) unawaited(pause());
+    });
+    session.interruptionEventStream.listen((event) {
+      if (event.begin && audio.state.playing) unawaited(pause());
+    });
     Timer.periodic(const Duration(seconds: 4), (_) {
-      if (audio.playing) unawaited(save());
+      if (audio.state.playing) unawaited(save());
     });
   }
 
@@ -179,7 +187,7 @@ class ListeningSession extends BaseAudioHandler {
       playbackState.value.copyWith(
         controls: [
           MediaControl.skipToPrevious,
-          audio.playing ? MediaControl.pause : MediaControl.play,
+          audio.state.playing ? MediaControl.pause : MediaControl.play,
           MediaControl.skipToNext,
         ],
         systemActions: {
@@ -187,12 +195,12 @@ class ListeningSession extends BaseAudioHandler {
           MediaAction.fastForward,
           MediaAction.rewind,
         },
-        playing: audio.playing,
+        playing: audio.state.playing,
         processingState:
-            AudioProcessingState.values[audio.processingState.index],
-        updatePosition: audio.position,
-        bufferedPosition: audio.bufferedPosition,
-        speed: audio.speed,
+            busy ? AudioProcessingState.loading : !ready ? AudioProcessingState.idle : audio.state.completed ? AudioProcessingState.completed : audio.state.buffering ? AudioProcessingState.buffering : AudioProcessingState.ready,
+        updatePosition: audio.state.position,
+        bufferedPosition: audio.state.buffer,
+        speed: audio.state.rate,
       ),
     );
     revision.value++;
@@ -204,9 +212,9 @@ class ListeningSession extends BaseAudioHandler {
       book!.bvid,
       cid: chapter!.cid,
       chapterIndex: index,
-      positionMs: audio.position.inMilliseconds,
+      positionMs: audio.state.position.inMilliseconds,
       chapterDurationMs:
-          audio.duration?.inMilliseconds ?? chapter!.duration * 1000,
+          audio.state.duration.inMilliseconds,
       totalChapters: chapters.length,
     );
   }
@@ -250,8 +258,8 @@ class ListeningSession extends BaseAudioHandler {
         final fetched = await _takeSources(selected.bvid, current.cid);
         startupDetails.add('取播放地址 ${sourceClock.elapsedMilliseconds} ms');
         final sources = [
-          ...fetched.where((s) => s is! BiliStreamAudioSource || !attempted.contains(s.uri)),
-          ...fetched.whereType<BiliStreamAudioSource>().where((s) => attempted.contains(s.uri)),
+          ...fetched.where((s) => !attempted.contains(s.uri)),
+          ...fetched.where((s) => attempted.contains(s.uri)),
         ];
         debugPrint('[TingX] source lookup: cid=${current.cid}, '
             'attempt=$refresh, elapsed=${sourceClock.elapsedMilliseconds}ms, '
@@ -262,29 +270,25 @@ class ListeningSession extends BaseAudioHandler {
             candidate < sources.length && candidate < 2;
             candidate++) {
           final source = sources[candidate];
-          if (source is BiliStreamAudioSource) attempted.add(source.uri);
+          attempted.add(source.uri);
           final loadClock = Stopwatch()..start();
           try {
             final timeout = experimentalStream && candidate == 0 && refresh == 0
                 ? const Duration(seconds: 15)
                 : const Duration(seconds: 5);
-            await audio.setAudioSource(
-              source,
-              initialPosition: Duration(milliseconds: offset),
-            ).timeout(timeout);
+            await _load(source, offset, timeout);
             debugPrint('[TingX] source opened: cid=${current.cid}, '
                 'candidate=$candidate, elapsed=${loadClock.elapsedMilliseconds}ms');
-            startupDetails.add('打开音轨 ${source is BiliStreamAudioSource ? source.trackId : candidate} 成功 ${loadClock.elapsedMilliseconds} ms');
-            if (source is BiliStreamAudioSource) _activeStream = source;
+            startupDetails.add('打开音轨 ${source.trackId} 成功 ${loadClock.elapsedMilliseconds} ms');
+            _activeStream = source;
             opened = true;
             break;
           } catch (e) {
-            startupDetails.add('打开音轨 ${source is BiliStreamAudioSource ? source.trackId : candidate} 失败 ${loadClock.elapsedMilliseconds} ms');
-            if (source is BiliStreamAudioSource) source.close();
+            startupDetails.add('打开音轨 ${source.trackId} 失败 ${loadClock.elapsedMilliseconds} ms');
+            await audio.stop();
+            source.close();
             lastError = e;
-            if (source is BiliStreamAudioSource) {
-              attempts.add('${source.trackId}/${source.bandwidth ~/ 1000}k ${loadClock.elapsedMilliseconds}ms');
-            }
+            attempts.add('${source.trackId}/${source.bandwidth ~/ 1000}k ${loadClock.elapsedMilliseconds}ms');
             if (candidate == 0 && refresh == 0) {
               firstProbe = _diagnoseSource(source);
             }
@@ -311,7 +315,7 @@ class ListeningSession extends BaseAudioHandler {
           title: current.part,
           album: selected.cleanTitle,
           artist: selected.author,
-          duration: audio.duration,
+          duration: audio.state.duration,
           artUri: selected.pic.isEmpty ? null : Uri.tryParse(selected.pic),
         ),
       );
@@ -380,15 +384,10 @@ class ListeningSession extends BaseAudioHandler {
     if (!activated) {
       throw StateError('iOS 音频会话激活失败：$activationError');
     }
-    if (audio.processingState == ProcessingState.completed) {
+    if (audio.state.completed) {
       await audio.seek(Duration.zero);
     }
-    // just_audio's play() future completes when playback stops/pauses.
-    // Do not await the full chapter while loading or switching chapters.
-    unawaited(audio.play().catchError((Object e) {
-      error = '播放中断：$e';
-      revision.value++;
-    }));
+    await audio.play();
   }
 
   @override
@@ -414,7 +413,7 @@ class ListeningSession extends BaseAudioHandler {
     if (!ready) return;
     final ms = position.inMilliseconds.clamp(
       0,
-      audio.duration?.inMilliseconds ?? 0,
+      audio.state.duration.inMilliseconds,
     );
     await audio.seek(Duration(milliseconds: ms));
     await save();
@@ -422,9 +421,9 @@ class ListeningSession extends BaseAudioHandler {
 
   @override
   Future<void> fastForward() =>
-      seek(audio.position + const Duration(seconds: 15));
+      seek(audio.state.position + const Duration(seconds: 15));
   @override
-  Future<void> rewind() => seek(audio.position - const Duration(seconds: 15));
+  Future<void> rewind() => seek(audio.state.position - const Duration(seconds: 15));
   @override
   Future<void> skipToNext() async {
     if (book != null) await open(book!, chapters, index + 1);
