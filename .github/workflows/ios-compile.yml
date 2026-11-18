@@ -42,8 +42,25 @@ jobs:
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
       - name: Run regression tests
         run: flutter test --reporter expanded
-      - name: Build iOS simulator
-        run: flutter build ios --simulator --debug --no-codesign
+      - name: Build iPhone device app (unsigned)
+        run: flutter build ios --release --no-codesign
+      - name: Package unsigned IPA for external signing
+        run: |
+          set -euo pipefail
+          APP="build/ios/iphoneos/Runner.app"
+          test -d "$APP"
+          mkdir -p build/ipa/Payload
+          ditto "$APP" build/ipa/Payload/Runner.app
+          cd build/ipa
+          zip -qry TingX-unsigned.ipa Payload
+          unzip -t TingX-unsigned.ipa | tail -1
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: TingX-unsigned-ipa
+          path: build/ipa/TingX-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14
       - name: Capture environment on failure
         if: failure()
         run: |
