@@ -298,13 +298,23 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
         title: Text(titles[tab]),
         actions: [
           if (tab == 0)
-            IconButton(
-              tooltip: '设置',
+            PopupMenuButton<String>(
+              tooltip: '更多',
               icon: const Icon(Icons.more_horiz),
-              onPressed: () => Navigator.push<void>(
-                context,
-                MaterialPageRoute(builder: (_) => const TingXSettings()),
-              ),
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'settings', child: Text('设置')),
+                PopupMenuItem(value: 'timing', child: Text('起播耗时')),
+              ],
+              onSelected: (value) {
+                if (value == 'settings') {
+                  Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const TingXSettings()));
+                  return;
+                }
+                showDialog<void>(context: context, builder: (_) => AlertDialog(
+                  title: const Text('本次起播耗时'),
+                  content: SelectableText(player.startupDetails.isEmpty ? '暂无记录' : player.startupDetails.join('\n')),
+                ));
+              },
             ),
         ],
       ),

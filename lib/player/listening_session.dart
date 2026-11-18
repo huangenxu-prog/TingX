@@ -143,6 +143,7 @@ class ListeningSession extends BaseAudioHandler {
   bool ready = false;
   bool completingChapter = false;
   String? error;
+  final startupDetails = <String>[];
   Timer? sleep;
   Chapter? get chapter => chapters.elementAtOrNull(index);
 
@@ -217,6 +218,7 @@ class ListeningSession extends BaseAudioHandler {
   }) async {
     if (busy || at < 0 || at >= parts.length) return;
     final startupClock = Stopwatch()..start();
+    startupDetails.clear();
     busy = true;
     error = null;
     revision.value++;
@@ -228,6 +230,7 @@ class ListeningSession extends BaseAudioHandler {
       chapters = parts;
       index = at;
       final current = parts[at];
+      startupDetails.add('${current.part}\n保存进度和停止上一章 ${startupClock.elapsedMilliseconds} ms');
       // Bilibili DASH URLs can be signed and short-lived. If every CDN
       // endpoint fails, request fresh addresses once before showing an error.
       // Never retry indefinitely or skip the chapter silently.
@@ -242,6 +245,7 @@ class ListeningSession extends BaseAudioHandler {
         }
         final sourceClock = Stopwatch()..start();
         final fetched = await _takeSources(selected.bvid, current.cid);
+        startupDetails.add('取播放地址 ${sourceClock.elapsedMilliseconds} ms');
         final sources = [
           ...fetched.where((s) => s is! BiliStreamAudioSource || !attempted.contains(s.uri)),
           ...fetched.whereType<BiliStreamAudioSource>().where((s) => attempted.contains(s.uri)),
@@ -267,9 +271,11 @@ class ListeningSession extends BaseAudioHandler {
             ).timeout(timeout);
             debugPrint('[TingX] source opened: cid=${current.cid}, '
                 'candidate=$candidate, elapsed=${loadClock.elapsedMilliseconds}ms');
+            startupDetails.add('打开音轨 ${source is BiliStreamAudioSource ? source.trackId : candidate} 成功 ${loadClock.elapsedMilliseconds} ms');
             opened = true;
             break;
           } catch (e) {
+            startupDetails.add('打开音轨 ${source is BiliStreamAudioSource ? source.trackId : candidate} 失败 ${loadClock.elapsedMilliseconds} ms');
             lastError = e;
             if (source is BiliStreamAudioSource) {
               attempts.add('${source.trackId}/${source.bandwidth ~/ 1000}k ${loadClock.elapsedMilliseconds}ms');
@@ -309,6 +315,7 @@ class ListeningSession extends BaseAudioHandler {
       ready = true;
       await save();
       await _startPlayback();
+      startupDetails.add('从打开章节到发起播放 ${startupClock.elapsedMilliseconds} ms');
       _prefetchNext();
       debugPrint('[TingX] startup ready: cid=${current.cid}, '
           'elapsed=${startupClock.elapsedMilliseconds}ms');
