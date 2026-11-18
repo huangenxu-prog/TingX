@@ -48,6 +48,7 @@ class BiliStreamAudioSource extends StreamAudioSource {
       final range = response.headers.value(HttpHeaders.contentRangeHeader);
       int? totalLength;
       int offset = 0;
+      int? rangeLength;
       if (response.statusCode == HttpStatus.partialContent) {
         final match = RegExp(r'^bytes (\d+)-(\d+)/(\d+|\*)$')
             .firstMatch(range ?? '');
@@ -58,7 +59,18 @@ class BiliStreamAudioSource extends StreamAudioSource {
         if (offset != begin) {
           throw const FormatException('Unexpected Content-Range offset');
         }
+        final last = int.parse(match.group(2)!);
+        if (last < offset) {
+          throw const FormatException('Reversed Content-Range');
+        }
+        rangeLength = last - offset + 1;
+        if (end != null && last >= end) {
+          throw const FormatException('Server exceeded requested audio range');
+        }
         totalLength = int.tryParse(match.group(3)!);
+        if (totalLength != null && last >= totalLength) {
+          throw const FormatException('Content-Range exceeds source length');
+        }
       } else if (response.contentLength >= 0) {
         totalLength = response.contentLength;
       }
@@ -69,6 +81,11 @@ class BiliStreamAudioSource extends StreamAudioSource {
           ? 'audio/mp4'
           : mime;
       final responseLength = response.contentLength;
+      if (rangeLength != null &&
+          responseLength >= 0 &&
+          responseLength != rangeLength) {
+        throw const FormatException('Content-Length disagrees with Content-Range');
+      }
       if (response.statusCode == HttpStatus.partialContent &&
           responseLength >= 0 &&
           totalLength != null &&
@@ -77,7 +94,7 @@ class BiliStreamAudioSource extends StreamAudioSource {
       }
       return StreamAudioResponse(
         sourceLength: totalLength,
-        contentLength: responseLength < 0 ? null : responseLength,
+        contentLength: responseLength < 0 ? rangeLength : responseLength,
         offset: offset,
         stream: response,
         contentType: contentType,
