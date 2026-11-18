@@ -1,0 +1,41 @@
+name: TingX iOS upstream compatibility
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/ios-upstream-compatibility.yml'
+jobs:
+  ios-probe:
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - name: Checkout TingX
+        uses: actions/checkout@v4
+      - name: Checkout upstream ABTS into isolated directory
+        uses: actions/checkout@v4
+        with:
+          repository: fengqiao57/abts
+          path: upstream-abts
+          persist-credentials: false
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Show toolchain
+        run: |
+          flutter --version
+          xcodebuild -version
+      - name: Generate iOS runner for upstream probe
+        working-directory: upstream-abts
+        run: flutter create --platforms=ios --project-name abts .
+      - name: Resolve packages
+        working-directory: upstream-abts
+        run: flutter pub get
+      - name: Analyze source
+        working-directory: upstream-abts
+        run: flutter analyze --no-fatal-infos
+        continue-on-error: true
+      - name: Attempt unsigned iOS simulator build
+        working-directory: upstream-abts
+        run: flutter build ios --simulator --debug --no-codesign
