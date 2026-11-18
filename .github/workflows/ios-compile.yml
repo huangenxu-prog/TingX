@@ -4,6 +4,9 @@ on:
     branches: [main]
     paths:
       - 'lib/**'
+      - 'test/**'
+      - 'scripts/**'
+      - 'assets/IMG_2691.png'
       - 'pubspec.yaml'
       - '.github/workflows/ios-compile.yml'
   workflow_dispatch:
@@ -28,5 +31,7 @@ jobs:
         run: dart format lib
       - name: Analyze
         run: flutter analyze --no-fatal-infos
+      - name: Run regression tests
+        run: flutter test
       - name: Build iOS simulator
         run: flutter build ios --simulator --debug --no-codesign
