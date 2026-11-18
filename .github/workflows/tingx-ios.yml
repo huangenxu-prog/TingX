@@ -1,0 +1,36 @@
+name: TingX iOS
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'lib/**'
+      - 'test/**'
+      - 'assets/**'
+      - 'pubspec.*'
+      - 'tool/prepare_ios.sh'
+      - '.github/workflows/tingx-ios.yml'
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.50.0'
+          cache: true
+      - run: bash tool/prepare_ios.sh
+      - run: flutter pub get
+      - run: flutter analyze --no-fatal-infos --no-fatal-warnings lib test
+      - run: flutter test
+      - run: flutter build ios --release --no-codesign
+      - name: Package unsigned IPA
+        run: |
+          mkdir Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          ditto -c -k --keepParent Payload TingX-unsigned.ipa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TingX-unsigned
+          path: TingX-unsigned.ipa
+          if-no-files-found: error

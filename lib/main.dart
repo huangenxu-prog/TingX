@@ -1,0 +1,419 @@
+import 'dart:async';
+
+import 'package:audio_service/audio_service.dart';
+import 'package:flutter/material.dart';
+
+import 'core/network/bili_client.dart';
+import 'core/storage/shelf_store.dart';
+import 'models/book.dart';
+import 'models/chapter.dart';
+import 'player/listening_session.dart';
+import 'services/bili_api.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Future.wait([
+    BiliClient.instance.initLocal(),
+    ShelfStore.instance.load(),
+  ]);
+  final player = await AudioService.init(
+    builder: ListeningSession.new,
+    config: const AudioServiceConfig(
+      androidNotificationChannelId: 'tingx.playback',
+      androidNotificationChannelName: 'TingX',
+    ),
+  );
+  await player.initialize();
+  runApp(
+    MaterialApp(
+      title: 'TingX',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xff84664e),
+          surface: const Color(0xfffaf6ee),
+        ),
+        scaffoldBackgroundColor: const Color(0xfffaf6ee),
+      ),
+      home: Home(player),
+    ),
+  );
+}
+
+class Home extends StatefulWidget {
+  const Home(this.player, {super.key});
+  final ListeningSession player;
+  @override
+  State<Home> createState() => _HomeState();
+}
+
+class _HomeState extends State<Home> with WidgetsBindingObserver {
+  int tab = 0;
+  final shelf = ShelfStore.instance;
+  final search = TextEditingController();
+  List<Book> results = [];
+  String? message;
+  bool searching = false;
+  int request = 0;
+  ListeningSession get player => widget.player;
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) unawaited(player.save());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    search.dispose();
+    super.dispose();
+  }
+
+  Future<void> find(String input) async {
+    final id = ++request;
+    final query = input.trim();
+    setState(() {
+      searching = query.isNotEmpty;
+      results = [];
+      message = null;
+    });
+    if (query.isEmpty) return;
+    try {
+      final books = await BiliApi.instance.search(query);
+      if (mounted && id == request)
+        setState(() {
+          results = books;
+          message = books.isEmpty ? '没有找到相关有声书' : null;
+        });
+    } catch (e) {
+      if (mounted && id == request) setState(() => message = '搜索失败：$e');
+    } finally {
+      if (mounted && id == request) setState(() => searching = false);
+    }
+  }
+
+  Future<void> details(Book b) async {
+    final selected = await Navigator.push<(Book, List<Chapter>, int, int)>(
+      context,
+      MaterialPageRoute(builder: (_) => Detail(b)),
+    );
+    if (selected == null || !mounted) return;
+    setState(() => tab = 0);
+    await player.open(
+      selected.$1,
+      selected.$2,
+      selected.$3,
+      offset: selected.$4,
+    );
+  }
+
+  Widget playback() {
+    final b = player.book;
+    if (b == null && !player.busy) {
+      final recent = shelf.books.firstOrNull;
+      return Center(
+        child: FilledButton.tonalIcon(
+          icon: const Icon(Icons.headphones),
+          onPressed: () =>
+              recent == null ? setState(() => tab = 1) : details(recent.book),
+          label: Text(
+            recent == null ? '去发现有声书' : '继续收听 · ${recent.book.cleanTitle}',
+            maxLines: 2,
+          ),
+        ),
+      );
+    }
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        Center(child: SizedBox(width: 220, height: 230, child: cover(b))),
+        const SizedBox(height: 24),
+        Text(
+          b?.cleanTitle ?? '',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        Text(player.chapter?.part ?? '', textAlign: TextAlign.center),
+        if (player.busy) const LinearProgressIndicator(),
+        if (player.error != null) Text(player.error!),
+        if (player.error != null && b != null)
+          TextButton(onPressed: () => details(b), child: const Text('重新选择章节')),
+        StreamBuilder<Duration>(
+          stream: player.audio.positionStream,
+          builder: (_, snapshot) {
+            final total = player.audio.duration?.inSeconds ?? 0;
+            final pos = (snapshot.data ?? Duration.zero).inSeconds.clamp(
+              0,
+              total,
+            );
+            return Column(
+              children: [
+                Slider(
+                  value: pos.toDouble(),
+                  max: total > 0 ? total.toDouble() : 1,
+                  onChanged: player.ready
+                      ? (v) => player.seek(Duration(seconds: v.round()))
+                      : null,
+                ),
+                Text('${clock(pos)}  /  ${clock(total)}'),
+              ],
+            );
+          },
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            IconButton(
+              tooltip: '上一章',
+              onPressed: player.index > 0 ? player.skipToPrevious : null,
+              icon: const Icon(Icons.skip_previous),
+            ),
+            TextButton(onPressed: player.rewind, child: const Text('−15s')),
+            IconButton.filled(
+              tooltip: player.audio.playing ? '暂停' : '播放',
+              onPressed: player.ready
+                  ? (player.audio.playing ? player.pause : player.play)
+                  : null,
+              icon: Icon(player.audio.playing ? Icons.pause : Icons.play_arrow),
+            ),
+            TextButton(
+              onPressed: player.fastForward,
+              child: const Text('+15s'),
+            ),
+            IconButton(
+              tooltip: '下一章',
+              onPressed: player.index + 1 < player.chapters.length
+                  ? player.skipToNext
+                  : null,
+              icon: const Icon(Icons.skip_next),
+            ),
+          ],
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            TextButton(
+              onPressed: b == null ? null : () => details(b),
+              child: const Text('章节'),
+            ),
+            PopupMenuButton<double>(
+              onSelected: (v) async {
+                await player.audio.setSpeed(v);
+                player.publish();
+              },
+              itemBuilder: (_) => [
+                for (final n in [0.75, 1.0, 1.25, 1.5, 2.0])
+                  PopupMenuItem(value: n, child: Text('${n}×')),
+              ],
+              child: Text('${player.audio.speed}×'),
+            ),
+            PopupMenuButton<int>(
+              onSelected: player.setSleep,
+              itemBuilder: (_) => [
+                for (final m in [0, 15, 30, 60])
+                  PopupMenuItem(
+                    value: m,
+                    child: Text(m == 0 ? '关闭定时' : '$m 分钟'),
+                  ),
+              ],
+              child: const Text('睡眠定时'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget discover() => Column(
+    children: [
+      Padding(
+        padding: const EdgeInsets.all(16),
+        child: TextField(
+          controller: search,
+          onSubmitted: find,
+          textInputAction: TextInputAction.search,
+          decoration: InputDecoration(
+            hintText: '搜索书名或演播者',
+            suffixIcon: IconButton(
+              onPressed: () => find(search.text),
+              icon: const Icon(Icons.search),
+            ),
+          ),
+        ),
+      ),
+      if (searching) const LinearProgressIndicator(),
+      if (message != null)
+        Padding(padding: const EdgeInsets.all(12), child: Text(message!)),
+      Expanded(
+        child: ListView.builder(
+          itemCount: results.length,
+          itemBuilder: (_, i) {
+            final b = results[i];
+            return ListTile(
+              leading: SizedBox(width: 56, child: cover(b)),
+              title: Text(b.cleanTitle),
+              subtitle: Text(b.author),
+              onTap: () => details(b),
+            );
+          },
+        ),
+      ),
+    ],
+  );
+
+  Widget bookshelf() {
+    final entries = shelf.books;
+    if (entries.isEmpty) return const Center(child: Text('书架还是空的'));
+    return GridView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: entries.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        childAspectRatio: 0.62,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 16,
+      ),
+      itemBuilder: (_, i) {
+        final entry = entries[i];
+        return InkWell(
+          onTap: () => details(entry.book),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: SizedBox.expand(child: cover(entry.book))),
+              Text(
+                entry.book.cleanTitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              Text('已听 ${(entry.percent * 100).round()}%'),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const titles = ['播放器', '发现', '书架'];
+    return Scaffold(
+      appBar: AppBar(title: Text(titles[tab])),
+      body: SafeArea(
+        child: ListenableBuilder(
+          listenable: Listenable.merge([player.revision, shelf]),
+          builder: (_, _) => [playback, discover, bookshelf][tab](),
+        ),
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: tab,
+        onDestinationSelected: (v) => setState(() => tab = v),
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.headphones), label: '播放器'),
+          NavigationDestination(
+            icon: Icon(Icons.explore_outlined),
+            label: '发现',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.library_books_outlined),
+            label: '书架',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String clock(int seconds) =>
+    '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
+Widget cover(Book? b) {
+  const fallback = ColoredBox(
+    color: Color(0xffe8dece),
+    child: Center(child: Icon(Icons.menu_book)),
+  );
+  if (b == null || b.pic.isEmpty) return fallback;
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(8),
+    child: Image.network(
+      b.pic,
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => fallback,
+    ),
+  );
+}
+
+class Detail extends StatefulWidget {
+  final Book book;
+  const Detail(this.book, {super.key});
+  @override
+  State<Detail> createState() => _DetailState();
+}
+
+class _DetailState extends State<Detail> {
+  late Future<(Book, List<Chapter>)> info = load();
+  Future<(Book, List<Chapter>)> load() async {
+    final b = await BiliApi.instance.detail(widget.book.bvid);
+    final parts = b.chapters;
+    return (
+      b,
+      parts != null && parts.isNotEmpty
+          ? parts
+          : await BiliApi.instance.pageList(b.bvid),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: Text(widget.book.cleanTitle)),
+    body: FutureBuilder(
+      future: info,
+      builder: (_, snapshot) {
+        if (snapshot.hasError)
+          return Center(
+            child: TextButton(
+              onPressed: () => setState(() => info = load()),
+              child: Text('目录加载失败，点击重试\n${snapshot.error}'),
+            ),
+          );
+        if (!snapshot.hasData)
+          return const Center(child: CircularProgressIndicator());
+        final (b, parts) = snapshot.requireData;
+        if (parts.isEmpty) return const Center(child: Text('暂无可播放章节'));
+        final saved = ShelfStore.instance.byBvid(b.bvid);
+        final last = parts.indexWhere((c) => c.cid == saved?.lastCid);
+        void choose(int i) => Navigator.pop(context, (
+          b,
+          parts,
+          i,
+          i == last ? saved!.positionMs : 0,
+        ));
+        return Column(
+          children: [
+            FilledButton.tonal(
+              onPressed: () => choose(last < 0 ? 0 : last),
+              child: Text(
+                last >= 0 ? '继续收听 · ${saved!.positionText}' : '从第一章播放',
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                itemCount: parts.length,
+                itemBuilder: (_, i) => ListTile(
+                  title: Text(parts[i].part),
+                  leading: Text('${i + 1}'),
+                  trailing: Text(parts[i].durationText),
+                  onTap: () => choose(i),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+}

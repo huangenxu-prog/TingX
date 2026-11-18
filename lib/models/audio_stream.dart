@@ -17,15 +17,15 @@ class AudioTrack {
   });
 
   factory AudioTrack.fromMap(Map<String, dynamic> m) => AudioTrack(
-        id: int.tryParse('${m['id'] ?? 0}') ?? 0,
-        baseUrl: m['baseUrl'] as String? ?? '',
-        backupUrls: (m['backup_url'] as List? ?? [])
-            .map((e) => e.toString())
-            .toList(),
-        bandwidth: int.tryParse('${m['bandwidth'] ?? 0}') ?? 0,
-        codecs: m['codecs'] as String? ?? '',
-        quality: int.tryParse('${m['id'] ?? 0}') ?? 0,
-      );
+    id: int.tryParse('${m['id'] ?? 0}') ?? 0,
+    baseUrl: (m['baseUrl'] ?? m['base_url']) as String? ?? '',
+    backupUrls: ((m['backupUrl'] ?? m['backup_url']) as List? ?? [])
+        .map((e) => e.toString())
+        .toList(),
+    bandwidth: int.tryParse('${m['bandwidth'] ?? 0}') ?? 0,
+    codecs: m['codecs'] as String? ?? '',
+    quality: int.tryParse('${m['id'] ?? 0}') ?? 0,
+  );
 
   String get qualityLabel {
     final q = id;
@@ -63,19 +63,27 @@ class BookAudio {
       tracks: audio
           .map((e) => AudioTrack.fromMap(e as Map<String, dynamic>))
           .toList(),
-      flac: dash['flac'] is Map
-          ? AudioTrack.fromMap((dash['flac'] as Map)['audio'] as Map<String, dynamic>)
+      flac: dash['flac'] is Map && (dash['flac'] as Map)['audio'] is Map
+          ? AudioTrack.fromMap(
+              (dash['flac'] as Map)['audio'] as Map<String, dynamic>,
+            )
           : null,
-      dolby: dash['dolby'] is Map &&
+      dolby:
+          dash['dolby'] is Map &&
               (dash['dolby'] as Map)['audio'] is List &&
               ((dash['dolby'] as Map)['audio'] as List).isNotEmpty
           ? AudioTrack.fromMap(
               ((dash['dolby'] as Map)['audio'] as List).first
-                  as Map<String, dynamic>)
+                  as Map<String, dynamic>,
+            )
           : null,
       timelength: int.tryParse('${m['timelength'] ?? 0}') ?? 0,
-      lastPlayTime: m['last_play_time'] is num ? m['last_play_time'] as int? : null,
-      lastPlayCid: m['last_play_cid'] is num ? m['last_play_cid'] as int? : null,
+      lastPlayTime: m['last_play_time'] is num
+          ? m['last_play_time'] as int?
+          : null,
+      lastPlayCid: m['last_play_cid'] is num
+          ? m['last_play_cid'] as int?
+          : null,
     );
   }
 
@@ -84,7 +92,8 @@ class BookAudio {
     if (tracks.isEmpty) return flac ?? dolby ?? AudioTrack(id: 0, baseUrl: '');
     if (flac != null && flac!.baseUrl.isNotEmpty) return flac!;
     if (dolby != null && dolby!.baseUrl.isNotEmpty) return dolby!;
-    final sorted = [...tracks]..sort((a, b) => b.bandwidth.compareTo(a.bandwidth));
+    final sorted = [...tracks]
+      ..sort((a, b) => b.bandwidth.compareTo(a.bandwidth));
     return sorted.first;
   }
 }

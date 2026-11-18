@@ -1,12 +1,23 @@
 name: tingx
 description: TingX iOS audiobook player
 publish_to: none
-version: 0.1.0+1
+version: 1.0.0+1
 environment:
   sdk: ^3.10.8
 dependencies:
   flutter:
     sdk: flutter
-  crypto: ^3.0.7
+  audio_service: ^0.18.19
+  just_audio: ^0.10.5
+  audio_session: ^0.2.2
   dio: ^5.11.1
+  crypto: ^3.0.7
   shared_preferences: ^2.5.5
+  qr_flutter: ^4.1.0
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/ABTS-LICENSE.txt

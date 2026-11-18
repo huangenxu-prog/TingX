@@ -29,4 +29,4 @@ Retain upstream copyright, license, and attribution when importing or adapting c
 
 The isolated upstream iOS simulator probe reached Xcode and failed on a duplicate UmengCommonSdkPlugin declaration (Actions run 44216973352). Static analysis in that probe was allowed to fail.
 
-Imported the upstream Bilibili network client, search/detail/stream service, and book, chapter, and audio models with attribution. The TingX package currently contains the data layer only. The runner, player integration, TingX UI, and end-to-end playback verification are pending.
+Imported the upstream Bilibili network client, search/detail/stream service, and book, chapter, and audio models with attribution. The iOS target uses a generated Flutter runner, just_audio playback and an audio_service media session. The first UI connects search, chapter selection, playback and local progress. Device playback, discovery rankings and optional login still require verification or implementation.
