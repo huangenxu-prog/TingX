@@ -19,6 +19,9 @@ jobs:
           cache: true
       - name: Generate iOS project if absent
         run: flutter create --platforms=ios --project-name tingx .
+      - name: Install TingX app icon from uploaded artwork
+        run: |
+          python3 scripts/install_ios_icon.py
       - name: Resolve dependencies
         run: flutter pub get
       - name: Format source for analysis
