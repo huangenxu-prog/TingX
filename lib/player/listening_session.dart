@@ -154,6 +154,7 @@ class ListeningSession extends BaseAudioHandler {
         ),
       );
       await shelf.add(selected);
+      await shelf.setTotalChapters(selected.bvid, parts.length);
       ready = true;
       await save();
       unawaited(play());
@@ -166,10 +167,16 @@ class ListeningSession extends BaseAudioHandler {
   }
 
   Future<void> finishChapter() async {
-    if (busy || !ready) return;
+    if (busy || !ready || book == null || chapter == null) return;
+    // Completion is distinct from merely reaching a later chapter.
+    final finishedBook = book!;
+    final finishedCid = chapter!.cid;
+    await shelf.markChapterDone(finishedBook.bvid, finishedCid);
+    if (book?.bvid != finishedBook.bvid || chapter?.cid != finishedCid) return;
     if (index + 1 < chapters.length) {
       await skipToNext();
     } else {
+      await save();
       await pause();
     }
   }
