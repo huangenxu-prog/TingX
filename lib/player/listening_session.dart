@@ -61,7 +61,9 @@ class ListeningSession extends BaseAudioHandler {
     ];
   }
 
-  final audio = AudioPlayer(useProxyForRequestHeaders: false);
+  // just_audio sends custom Referer/User-Agent headers through its local
+  // proxy on iOS. Disabling the proxy can cause CDN requests to omit them.
+  final audio = AudioPlayer(useProxyForRequestHeaders: true);
   AudioSession? _audioSession;
   final revision = ValueNotifier(0);
   final shelf = ShelfStore.instance;
@@ -205,6 +207,7 @@ class ListeningSession extends BaseAudioHandler {
       await save();
       await _startPlayback();
     } catch (e) {
+      ready = false;
       error = '本章播放失败：$e';
     } finally {
       busy = false;
