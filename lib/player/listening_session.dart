@@ -169,18 +169,23 @@ class ListeningSession extends BaseAudioHandler {
           await Future<void>.delayed(const Duration(milliseconds: 500));
         }
         final sourceClock = Stopwatch()..start();
-        final sources = await chapterSources(selected.bvid, current.cid);
+        final sources = await chapterSources(selected.bvid, current.cid)
+            .timeout(const Duration(seconds: 12));
         debugPrint('[TingX] source lookup: cid=${current.cid}, '
             'attempt=$refresh, elapsed=${sourceClock.elapsedMilliseconds}ms, '
             'candidates=${sources.length}');
-        for (var candidate = 0; candidate < sources.length; candidate++) {
+        // Avoid minutes of serial attempts across many CDN backups.
+        // Try the top two candidates, then refresh signed URLs once.
+        for (var candidate = 0;
+            candidate < sources.length && candidate < 2;
+            candidate++) {
           final source = sources[candidate];
           final loadClock = Stopwatch()..start();
           try {
             await audio.setAudioSource(
               source,
               initialPosition: Duration(milliseconds: offset),
-            ).timeout(const Duration(seconds: 8));
+            ).timeout(const Duration(seconds: 5));
             debugPrint('[TingX] source opened: cid=${current.cid}, '
                 'candidate=$candidate, elapsed=${loadClock.elapsedMilliseconds}ms');
             opened = true;
