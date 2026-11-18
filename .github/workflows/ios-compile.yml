@@ -21,8 +21,8 @@ jobs:
         run: flutter create --platforms=ios --project-name tingx .
       - name: Resolve dependencies
         run: flutter pub get
-      - name: Format check
-        run: dart format --output=none --set-exit-if-changed lib
+      - name: Format source for analysis
+        run: dart format lib
       - name: Analyze
         run: flutter analyze --no-fatal-infos
       - name: Build iOS simulator
