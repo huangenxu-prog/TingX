@@ -390,6 +390,7 @@ class _DetailState extends State<Detail> {
         if (parts.isEmpty) return const Center(child: Text('暂无可播放章节'));
         final saved = ShelfStore.instance.byBvid(b.bvid);
         final last = parts.indexWhere((c) => c.cid == saved?.lastCid);
+        final done = saved?.doneCids.toSet() ?? <int>{};
         void choose(int i) => Navigator.pop(context, (
           b,
           parts,
@@ -410,7 +411,9 @@ class _DetailState extends State<Detail> {
                 itemBuilder: (_, i) => ListTile(
                   title: Text(parts[i].part),
                   leading: Text('${i + 1}'),
-                  trailing: Text(parts[i].durationText),
+                  trailing: done.contains(parts[i].cid)
+                      ? const Icon(Icons.check_circle_outline, color: Color(0xff84664e))
+                      : Text(parts[i].durationText),
                   onTap: () => choose(i),
                 ),
               ),
