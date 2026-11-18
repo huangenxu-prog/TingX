@@ -167,7 +167,14 @@ class _QrLoginState extends State<_QrLogin> {
       children: [
         if (url != null)
           QrImageView(data: url!, size: 220, backgroundColor: Colors.white)
-        else const SizedBox(height: 220, child: Center(child: CircularProgressIndicator())),
+        else SizedBox(
+          height: 220,
+          child: Center(
+            child: status == '正在获取二维码…'
+                ? const CircularProgressIndicator()
+                : const Icon(Icons.qr_code_2, size: 96, color: Colors.grey),
+          ),
+        ),
         const SizedBox(height: 20),
         Text(status),
         const SizedBox(height: 16),
