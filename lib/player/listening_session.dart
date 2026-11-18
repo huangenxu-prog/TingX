@@ -17,12 +17,38 @@ class ListeningSession extends BaseAudioHandler {
 
   static Future<List<AudioSource>> onlineSources(String bvid, int cid) async {
     final result = await BiliApi.instance.playUrl(bvid, cid);
-    final urls = <String>{
-      for (final t in [...result.tracks, ?result.dolby, ?result.flac])
-        for (final u in [t.baseUrl, ...t.backupUrls])
-          if (u.startsWith('https://') || u.startsWith('http://'))
-            u.replaceFirst('http://', 'https://'),
-    };
+
+    // iOS AVPlayer supports AAC/MP4 most reliably. Try ordinary DASH
+    // audio first; Dolby/FLAC are fallback only, not the default.
+    final tracks = [...result.tracks]
+      ..sort((a, b) {
+        final aAac = a.codecs.toLowerCase().contains('mp4a') ? 1 : 0;
+        final bAac = b.codecs.toLowerCase().contains('mp4a') ? 1 : 0;
+        if (aAac != bAac) return bAac.compareTo(aAac);
+        return b.bandwidth.compareTo(a.bandwidth);
+      });
+
+    final urls = <String>{};
+    void addUrls(String primary, List<String> backups) {
+      for (final raw in [primary, ...backups]) {
+        if (raw.startsWith('https://')) {
+          urls.add(raw);
+        } else if (raw.startsWith('http://')) {
+          urls.add(raw.replaceFirst('http://', 'https://'));
+        }
+      }
+    }
+
+    for (final track in tracks) {
+      addUrls(track.baseUrl, track.backupUrls);
+    }
+    if (result.dolby != null) {
+      addUrls(result.dolby!.baseUrl, result.dolby!.backupUrls);
+    }
+    if (result.flac != null) {
+      addUrls(result.flac!.baseUrl, result.flac!.backupUrls);
+    }
+
     return [
       for (final url in urls)
         AudioSource.uri(
