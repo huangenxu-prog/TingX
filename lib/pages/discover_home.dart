@@ -24,6 +24,9 @@ class _DiscoverHomeState extends State<DiscoverHome> {
   List<Book> enriched = [];
   bool loading = false;
   bool searching = false;
+  bool loadingMore = false;
+  bool hasMore = false;
+  int searchPage = 1;
   String? error;
   String? keyword;
   final Map<String, int> sectionOffsets = {};
@@ -69,15 +72,42 @@ class _DiscoverHomeState extends State<DiscoverHome> {
   Future<void> find(String value) async {
     final q = value.trim();
     final id = ++generation;
-    setState(() { keyword = q.isEmpty ? null : q; results = []; searching = q.isNotEmpty; error = null; });
+    setState(() { keyword = q.isEmpty ? null : q; results = []; searching = q.isNotEmpty; hasMore = false; searchPage = 1; error = null; });
     if (q.isEmpty) { refresh(); return; }
     try {
-      final list = await api.search(q);
-      if (mounted && id == generation) setState(() => results = list);
+      var rawCount = 0;
+      final list = await api.search(q, onRawCount: (count) => rawCount = count);
+      if (mounted && id == generation) setState(() { results = list; hasMore = rawCount >= 20; });
     } catch (_) {
       if (mounted && id == generation) setState(() => error = '搜索失败，请稍后重试');
     } finally {
       if (mounted && id == generation) setState(() => searching = false);
+    }
+  }
+
+  Future<void> loadMore() async {
+    final q = keyword;
+    if (q == null || loadingMore || !hasMore) return;
+    final id = generation;
+    final next = searchPage + 1;
+    setState(() => loadingMore = true);
+    try {
+      var rawCount = 0;
+      final more = await api.search(q, page: next,
+        onRawCount: (count) => rawCount = count);
+      if (!mounted || id != generation) return;
+      final seen = results.map((b) => b.bvid).toSet();
+      setState(() {
+        results.addAll(more.where((b) => seen.add(b.bvid)));
+        searchPage = next;
+        hasMore = rawCount >= 20;
+      });
+    } catch (_) {
+      if (mounted && id == generation) {
+        setState(() => error = '加载更多失败，请重试');
+      }
+    } finally {
+      if (mounted && id == generation) setState(() => loadingMore = false);
     }
   }
 
@@ -109,7 +139,7 @@ class _DiscoverHomeState extends State<DiscoverHome> {
   );
 
   Widget section(String title, List<Book> source, {bool shuffle = true}) {
-    final books = batch(title, source);
+    final books = shuffle ? batch(title, source) : source;
     return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
@@ -189,8 +219,14 @@ class _DiscoverHomeState extends State<DiscoverHome> {
       if (loading || searching) const LinearProgressIndicator(),
       if (error != null) Padding(padding: const EdgeInsets.all(12), child: Text(error!)),
       const SizedBox(height: 20),
-      if (keyword != null)
-        section('搜索结果', results, shuffle: false)
+      if (keyword != null) ...[
+        section('搜索结果', results, shuffle: false),
+        if (hasMore || loadingMore)
+          TextButton(
+            onPressed: loadingMore ? null : loadMore,
+            child: Text(loadingMore ? '加载中…' : '加载更多'),
+          ),
+      ]
       else ...[
         section('热门推荐', hot),
         categoryStrip(),
