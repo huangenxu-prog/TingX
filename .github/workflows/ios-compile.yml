@@ -25,6 +25,12 @@ jobs:
           cache: true
       - name: Generate iOS project if absent
         run: flutter create --platforms=ios --project-name tingx .
+      - name: Remove Flutter-generated counter template test
+        run: |
+          if [ -f test/widget_test.dart ] && grep -q 'Counter increments smoke test' test/widget_test.dart && grep -q 'MyApp' test/widget_test.dart; then
+            rm test/widget_test.dart
+            echo 'Removed generated counter demo test; preserving TingX regression tests.'
+          fi
       - name: Install TingX app icon from uploaded artwork
         run: |
           python3 scripts/install_ios_icon.py
