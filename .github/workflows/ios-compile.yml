@@ -31,6 +31,12 @@ jobs:
             rm test/widget_test.dart
             echo 'Removed generated counter demo test; preserving TingX regression tests.'
           fi
+      - name: Configure iOS background audio
+        run: |
+          /usr/libexec/PlistBuddy -c 'Add :UIBackgroundModes array' ios/Runner/Info.plist 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c 'Add :UIBackgroundModes:0 string audio' ios/Runner/Info.plist 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c 'Set :UIBackgroundModes:0 audio' ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c 'Print :UIBackgroundModes' ios/Runner/Info.plist
       - name: Install TingX app icon from uploaded artwork
         run: |
           python3 scripts/install_ios_icon.py
