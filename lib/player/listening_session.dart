@@ -62,6 +62,7 @@ class ListeningSession extends BaseAudioHandler {
   }
 
   final audio = AudioPlayer(useProxyForRequestHeaders: false);
+  AudioSession? _audioSession;
   final revision = ValueNotifier(0);
   final shelf = ShelfStore.instance;
   Book? book;
@@ -77,6 +78,7 @@ class ListeningSession extends BaseAudioHandler {
   Future<void> initialize() async {
     final session = await AudioSession.instance;
     await session.configure(const AudioSessionConfiguration.speech());
+    _audioSession = session;
     audio.playbackEventStream.listen(
       (_) {
         publish();
@@ -201,7 +203,7 @@ class ListeningSession extends BaseAudioHandler {
       await shelf.setTotalChapters(selected.bvid, parts.length);
       ready = true;
       await save();
-      unawaited(play());
+      await _startPlayback();
     } catch (e) {
       error = '本章播放失败：$e';
     } finally {
@@ -233,17 +235,49 @@ class ListeningSession extends BaseAudioHandler {
     }
   }
 
+  Future<void> _startPlayback() async {
+    if (!ready) return;
+    // A failed AVAudioSession activation is not a bad Bilibili stream.
+    // Retry the session separately rather than cycling through CDN URLs.
+    final session = _audioSession ?? await AudioSession.instance;
+    Object? activationError;
+    var activated = false;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        activated = await session.setActive(true);
+        if (activated) break;
+        activationError = StateError('音频会话未能激活');
+      } catch (e) {
+        activationError = e;
+      }
+      if (attempt == 0) {
+        await Future<void>.delayed(const Duration(milliseconds: 350));
+      }
+    }
+    if (!activated) {
+      throw StateError('iOS 音频会话激活失败：$activationError');
+    }
+    if (audio.processingState == ProcessingState.completed) {
+      await audio.seek(Duration.zero);
+    }
+    // just_audio's play() future completes when playback stops/pauses.
+    // Do not await the full chapter while loading or switching chapters.
+    unawaited(audio.play().catchError((Object e) {
+      error = '播放中断：$e';
+      revision.value++;
+    }));
+  }
+
   @override
   Future<void> play() async {
     if (!ready) return;
     try {
-      if (audio.processingState == ProcessingState.completed)
-        await audio.seek(Duration.zero);
-      await audio.play();
+      await _startPlayback();
+      error = null;
     } catch (e) {
       error = '无法播放：$e';
-      revision.value++;
     }
+    revision.value++;
   }
 
   @override
