@@ -7,6 +7,7 @@ import 'core/network/bili_client.dart';
 import 'core/storage/shelf_store.dart';
 import 'models/book.dart';
 import 'pages/discover_home.dart';
+import 'pages/settings.dart';
 import 'models/chapter.dart';
 import 'player/listening_session.dart';
 import 'services/bili_api.dart';
@@ -291,7 +292,20 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     const titles = ['播放器', '发现', '书架'];
     return Scaffold(
-      appBar: AppBar(title: Text(titles[tab])),
+      appBar: AppBar(
+        title: Text(titles[tab]),
+        actions: [
+          if (tab == 0)
+            IconButton(
+              tooltip: '设置',
+              icon: const Icon(Icons.more_horiz),
+              onPressed: () => Navigator.push<void>(
+                context,
+                MaterialPageRoute(builder: (_) => const TingXSettings()),
+              ),
+            ),
+        ],
+      ),
       body: SafeArea(
         child: ListenableBuilder(
           listenable: Listenable.merge([player.revision, shelf]),
