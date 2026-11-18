@@ -52,6 +52,7 @@ class Home extends StatefulWidget {
 class _HomeState extends State<Home> with WidgetsBindingObserver {
   int tab = 0;
   final shelf = ShelfStore.instance;
+  late final Widget discoverPage = DiscoverHome(openBook: details);
   final search = TextEditingController();
   List<Book> results = [];
   String? message;
@@ -231,7 +232,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     );
   }
 
-  Widget discover() => DiscoverHome(openBook: (book) { details(book); });
+
 
   Widget bookshelf() {
     final entries = shelf.books;
@@ -309,7 +310,10 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       body: SafeArea(
         child: ListenableBuilder(
           listenable: Listenable.merge([player.revision, shelf]),
-          builder: (_, _) => [playback, discover, bookshelf][tab](),
+          builder: (_, _) => IndexedStack(
+            index: tab,
+            children: [playback(), discoverPage, bookshelf()],
+          ),
         ),
       ),
       bottomNavigationBar: NavigationBar(
