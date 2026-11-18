@@ -33,8 +33,14 @@ jobs:
       - name: Format source for analysis
         run: dart format lib
       - name: Analyze
-        run: flutter analyze --no-fatal-infos
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
       - name: Run regression tests
-        run: flutter test
+        run: flutter test --reporter expanded
       - name: Build iOS simulator
         run: flutter build ios --simulator --debug --no-codesign
+      - name: Capture environment on failure
+        if: failure()
+        run: |
+          flutter --version
+          flutter doctor -v
+          xcodebuild -version
