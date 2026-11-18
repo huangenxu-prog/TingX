@@ -43,6 +43,7 @@ class ListeningSession extends BaseAudioHandler {
   int index = 0;
   bool busy = false;
   bool ready = false;
+  bool completingChapter = false;
   String? error;
   Timer? sleep;
   Chapter? get chapter => chapters.elementAtOrNull(index);
@@ -167,17 +168,25 @@ class ListeningSession extends BaseAudioHandler {
   }
 
   Future<void> finishChapter() async {
-    if (busy || !ready || book == null || chapter == null) return;
-    // Completion is distinct from merely reaching a later chapter.
-    final finishedBook = book!;
-    final finishedCid = chapter!.cid;
-    await shelf.markChapterDone(finishedBook.bvid, finishedCid);
-    if (book?.bvid != finishedBook.bvid || chapter?.cid != finishedCid) return;
-    if (index + 1 < chapters.length) {
-      await skipToNext();
-    } else {
-      await save();
-      await pause();
+    if (busy || !ready || completingChapter || book == null || chapter == null) {
+      return;
+    }
+    completingChapter = true;
+    try {
+      final finishedBook = book!;
+      final finishedCid = chapter!.cid;
+      await shelf.markChapterDone(finishedBook.bvid, finishedCid);
+      if (book?.bvid != finishedBook.bvid || chapter?.cid != finishedCid) {
+        return;
+      }
+      if (index + 1 < chapters.length) {
+        await skipToNext();
+      } else {
+        await save();
+        await pause();
+      }
+    } finally {
+      completingChapter = false;
     }
   }
 
