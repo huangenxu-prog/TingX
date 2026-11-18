@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
@@ -64,6 +65,33 @@ class ListeningSession extends BaseAudioHandler {
   // just_audio sends custom Referer/User-Agent headers through its local
   // proxy on iOS. Disabling the proxy can cause CDN requests to omit them.
   final audio = AudioPlayer(useProxyForRequestHeaders: true);
+
+  // Diagnose the CDN response without logging expiring signed URLs.
+  // Only runs after a playback failure, never on the successful fast path.
+  Future<void> _diagnoseSource(AudioSource source) async {
+    if (source is! UriAudioSource) return;
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 4);
+    try {
+      final request = await client.getUrl(source.uri)
+          .timeout(const Duration(seconds: 4));
+      request.headers.set(HttpHeaders.refererHeader, BiliEndpoints.home);
+      request.headers.set(HttpHeaders.userAgentHeader, BiliEndpoints.userAgent);
+      request.headers.set(HttpHeaders.rangeHeader, 'bytes=0-1023');
+      final response = await request.close()
+          .timeout(const Duration(seconds: 4));
+      debugPrint('[TingX] CDN diagnostic: host=${source.uri.host}, '
+          'status=${response.statusCode}, '
+          'contentType=${response.headers.contentType}, '
+          'range=${response.headers.value(HttpHeaders.contentRangeHeader)}');
+      await response.drain<void>().timeout(const Duration(seconds: 4));
+    } catch (e) {
+      debugPrint('[TingX] CDN diagnostic failed: '
+          'host=${source.uri.host}, error=$e');
+    } finally {
+      client.close(force: true);
+    }
+  }
   AudioSession? _audioSession;
   final revision = ValueNotifier(0);
   final shelf = ShelfStore.instance;
@@ -192,6 +220,9 @@ class ListeningSession extends BaseAudioHandler {
             break;
           } catch (e) {
             lastError = e;
+            if (candidate == 0 && refresh == 0) {
+              unawaited(_diagnoseSource(source));
+            }
             debugPrint(
               '[TingX] audio open failed: chapter=${current.cid}, '
               'refresh=$refresh, candidate=$candidate, '
