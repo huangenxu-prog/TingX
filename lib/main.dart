@@ -10,6 +10,7 @@ import 'pages/discover_home.dart';
 import 'pages/settings.dart';
 import 'models/chapter.dart';
 import 'player/listening_session.dart';
+import 'player/playback_comparison.dart';
 import 'services/bili_api.dart';
 
 Future<void> main() async {
@@ -303,9 +304,15 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
               icon: const Icon(Icons.more_horiz),
               itemBuilder: (_) => const [
                 PopupMenuItem(value: 'settings', child: Text('设置')),
+                if (ListeningSession.experimentalStream)
+                  PopupMenuItem(value: 'compare', child: Text('同源播放对照')),
                 PopupMenuItem(value: 'timing', child: Text('起播耗时')),
               ],
-              onSelected: (value) {
+              onSelected: (value) async {
+                if (value == 'compare') {
+                  await comparePlayback(context, player);
+                  return;
+                }
                 if (value == 'settings') {
                   Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const TingXSettings()));
                   return;
