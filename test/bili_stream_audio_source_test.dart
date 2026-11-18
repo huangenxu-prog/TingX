@@ -14,6 +14,7 @@ void main() {
         'bytes 2-5/10',
       );
       request.response.headers.contentType = ContentType('audio', 'mp4');
+      request.response.contentLength = 4;
       request.response.add([2, 3, 4, 5]);
       await request.response.close();
     });
