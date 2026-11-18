@@ -38,3 +38,5 @@ jobs:
           name: TingX-Audio-Experimental-unsigned
           path: build/ipa/TingX-Audio-Experimental-unsigned.ipa
           if-no-files-found: error
+
+# Rebuild request: restored baseline 98295983b8872fcc45fa57a4b2f790b3ec6f47fa
