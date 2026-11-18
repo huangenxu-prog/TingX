@@ -282,6 +282,28 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
         final entry = entries[i];
         return InkWell(
           onTap: () => details(entry.book),
+          onLongPress: () async {
+            final remove = await showDialog<bool>(
+              context: context,
+              builder: (dialogContext) => AlertDialog(
+                title: const Text('移出书架'),
+                content: Text('确定将《${entry.book.cleanTitle}》移出书架吗？本地收听记录也会被删除。'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext, false),
+                    child: const Text('取消'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext, true),
+                    child: const Text('移出'),
+                  ),
+                ],
+              ),
+            );
+            if (remove == true) {
+              await shelf.remove(entry.book.bvid);
+            }
+          },
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
