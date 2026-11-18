@@ -37,6 +37,12 @@ jobs:
           /usr/libexec/PlistBuddy -c 'Add :UIBackgroundModes:0 string audio' ios/Runner/Info.plist 2>/dev/null || \
             /usr/libexec/PlistBuddy -c 'Set :UIBackgroundModes:0 audio' ios/Runner/Info.plist
           /usr/libexec/PlistBuddy -c 'Print :UIBackgroundModes' ios/Runner/Info.plist
+      - name: Allow just_audio local HTTP header proxy
+        run: |
+          /usr/libexec/PlistBuddy -c 'Add :NSAppTransportSecurity dict' ios/Runner/Info.plist 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c 'Add :NSAppTransportSecurity:NSAllowsLocalNetworking bool true' ios/Runner/Info.plist 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c 'Set :NSAppTransportSecurity:NSAllowsLocalNetworking true' ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c 'Print :NSAppTransportSecurity' ios/Runner/Info.plist
       - name: Install TingX app icon from uploaded artwork
         run: |
           python3 scripts/install_ios_icon.py
