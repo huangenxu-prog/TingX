@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'core/network/bili_client.dart';
 import 'core/storage/shelf_store.dart';
 import 'models/book.dart';
+import 'pages/discover_home.dart';
 import 'models/chapter.dart';
 import 'player/listening_session.dart';
 import 'services/bili_api.dart';
@@ -229,42 +230,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     );
   }
 
-  Widget discover() => Column(
-    children: [
-      Padding(
-        padding: const EdgeInsets.all(16),
-        child: TextField(
-          controller: search,
-          onSubmitted: find,
-          textInputAction: TextInputAction.search,
-          decoration: InputDecoration(
-            hintText: '搜索书名或演播者',
-            suffixIcon: IconButton(
-              onPressed: () => find(search.text),
-              icon: const Icon(Icons.search),
-            ),
-          ),
-        ),
-      ),
-      if (searching) const LinearProgressIndicator(),
-      if (message != null)
-        Padding(padding: const EdgeInsets.all(12), child: Text(message!)),
-      Expanded(
-        child: ListView.builder(
-          itemCount: results.length,
-          itemBuilder: (_, i) {
-            final b = results[i];
-            return ListTile(
-              leading: SizedBox(width: 56, child: cover(b)),
-              title: Text(b.cleanTitle),
-              subtitle: Text(b.author),
-              onTap: () => details(b),
-            );
-          },
-        ),
-      ),
-    ],
-  );
+  Widget discover() => DiscoverHome(openBook: (book) { details(book); });
 
   Widget bookshelf() {
     final entries = shelf.books;
