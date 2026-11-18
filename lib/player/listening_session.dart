@@ -11,8 +11,13 @@ import '../core/storage/shelf_store.dart';
 import '../models/book.dart';
 import '../models/chapter.dart';
 import '../services/bili_api.dart';
+import 'bili_stream_audio_source.dart';
 
 class ListeningSession extends BaseAudioHandler {
+  // Opt-in only: flutter build ... --dart-define=TINGX_EXPERIMENTAL_STREAM=true
+  // The production default remains the original URI playback path.
+  static const experimentalStream =
+      bool.fromEnvironment('TINGX_EXPERIMENTAL_STREAM');
   ListeningSession({this.chapterSources = onlineSources});
   final Future<List<AudioSource>> Function(String bvid, int cid) chapterSources;
 
@@ -52,13 +57,20 @@ class ListeningSession extends BaseAudioHandler {
 
     return [
       for (final url in urls)
-        AudioSource.uri(
-          Uri.parse(url),
-          headers: const {
-            'Referer': BiliEndpoints.home,
-            'User-Agent': BiliEndpoints.userAgent,
-          },
-        ),
+        if (experimentalStream)
+          BiliStreamAudioSource(
+            uri: Uri.parse(url),
+            referer: BiliEndpoints.home,
+            userAgent: BiliEndpoints.userAgent,
+          )
+        else
+          AudioSource.uri(
+            Uri.parse(url),
+            headers: const {
+              'Referer': BiliEndpoints.home,
+              'User-Agent': BiliEndpoints.userAgent,
+            },
+          ),
     ];
   }
 
