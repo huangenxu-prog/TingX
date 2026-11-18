@@ -357,14 +357,12 @@ class Detail extends StatefulWidget {
 class _DetailState extends State<Detail> {
   late Future<(Book, List<Chapter>)> info = load();
   Future<(Book, List<Chapter>)> load() async {
-    final b = await BiliApi.instance.detail(widget.book.bvid);
-    final parts = b.chapters;
-    return (
-      b,
-      parts != null && parts.isNotEmpty
-          ? parts
-          : await BiliApi.instance.pageList(b.bvid),
-    );
+    final selected = widget.book;
+    // The lightweight page list also works for titles without full view metadata.
+    final parts = await BiliApi.instance.pageList(selected.bvid);
+    if (parts.isNotEmpty) return (selected, parts);
+    final b = await BiliApi.instance.detail(selected.bvid);
+    return (b, b.chapters ?? <Chapter>[]);
   }
 
   @override

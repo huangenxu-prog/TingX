@@ -12,6 +12,29 @@ import '../models/chapter.dart';
 import '../services/bili_api.dart';
 
 class ListeningSession extends BaseAudioHandler {
+  ListeningSession({this.chapterSources = onlineSources});
+  final Future<List<AudioSource>> Function(String bvid, int cid) chapterSources;
+
+  static Future<List<AudioSource>> onlineSources(String bvid, int cid) async {
+    final result = await BiliApi.instance.playUrl(bvid, cid);
+    final urls = <String>{
+      for (final t in [...result.tracks, ?result.dolby, ?result.flac])
+        for (final u in [t.baseUrl, ...t.backupUrls])
+          if (u.startsWith('https://') || u.startsWith('http://'))
+            u.replaceFirst('http://', 'https://'),
+    };
+    return [
+      for (final url in urls)
+        AudioSource.uri(
+          Uri.parse(url),
+          headers: const {
+            'Referer': BiliEndpoints.home,
+            'User-Agent': BiliEndpoints.userAgent,
+          },
+        ),
+    ];
+  }
+
   final audio = AudioPlayer(useProxyForRequestHeaders: false);
   final revision = ValueNotifier(0);
   final shelf = ShelfStore.instance;
@@ -39,7 +62,8 @@ class ListeningSession extends BaseAudioHandler {
     audio.playerStateStream.listen((state) {
       if (ready &&
           !busy &&
-          state.playing && state.processingState == ProcessingState.completed) {
+          state.playing &&
+          state.processingState == ProcessingState.completed) {
         unawaited(finishChapter());
       }
     });
@@ -103,22 +127,12 @@ class ListeningSession extends BaseAudioHandler {
       chapters = parts;
       index = at;
       final current = parts[at];
-      final result = await BiliApi.instance.playUrl(selected.bvid, current.cid);
-      final urls = <String>{
-        for (final t in [...result.tracks, ?result.dolby, ?result.flac])
-          for (final u in [t.baseUrl, ...t.backupUrls])
-            if (u.startsWith('https://') || u.startsWith('http://'))
-              u.replaceFirst('http://', 'https://'),
-      };
+      final sources = await chapterSources(selected.bvid, current.cid);
       Object? lastError;
-      for (final url in urls) {
+      for (final source in sources) {
         try {
-          await audio.setUrl(
-            url,
-            headers: const {
-              'Referer': BiliEndpoints.home,
-              'User-Agent': BiliEndpoints.userAgent,
-            },
+          await audio.setAudioSource(
+            source,
             initialPosition: Duration(milliseconds: offset),
           );
           lastError = null;
@@ -127,7 +141,7 @@ class ListeningSession extends BaseAudioHandler {
           lastError = e;
         }
       }
-      if (urls.isEmpty || lastError != null)
+      if (sources.isEmpty || lastError != null)
         throw StateError('音轨无法打开：${lastError ?? "没有播放地址"}');
       mediaItem.add(
         MediaItem(
