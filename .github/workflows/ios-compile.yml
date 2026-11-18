@@ -1,4 +1,7 @@
 name: TingX iOS compile verification
+concurrency:
+  group: tingx-ios-${{ github.ref }}
+  cancel-in-progress: true
 on:
   push:
     branches: [main]
