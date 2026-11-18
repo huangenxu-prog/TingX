@@ -154,22 +154,39 @@ class ListeningSession extends BaseAudioHandler {
       chapters = parts;
       index = at;
       final current = parts[at];
-      final sources = await chapterSources(selected.bvid, current.cid);
+      // Bilibili DASH URLs can be signed and short-lived. If every CDN
+      // endpoint fails, request fresh addresses once before showing an error.
+      // Never retry indefinitely or skip the chapter silently.
       Object? lastError;
-      for (final source in sources) {
-        try {
-          await audio.setAudioSource(
-            source,
-            initialPosition: Duration(milliseconds: offset),
-          );
-          lastError = null;
-          break;
-        } catch (e) {
-          lastError = e;
+      var opened = false;
+      for (var refresh = 0; refresh < 2 && !opened; refresh++) {
+        if (refresh > 0) {
+          await Future<void>.delayed(const Duration(milliseconds: 500));
+        }
+        final sources = await chapterSources(selected.bvid, current.cid);
+        for (final source in sources) {
+          try {
+            await audio.setAudioSource(
+              source,
+              initialPosition: Duration(milliseconds: offset),
+            );
+            opened = true;
+            break;
+          } catch (e) {
+            lastError = e;
+            debugPrint(
+              '[TingX] audio open failed: chapter=${current.cid}, '
+              'refresh=$refresh, error=$e',
+            );
+          }
+        }
+        if (sources.isEmpty) {
+          lastError = StateError('没有可用的音频地址');
         }
       }
-      if (sources.isEmpty || lastError != null)
-        throw StateError('音轨无法打开：${lastError ?? "没有播放地址"}');
+      if (!opened) {
+        throw StateError('全部音轨与备用地址均无法打开：$lastError');
+      }
       mediaItem.add(
         MediaItem(
           id: '${selected.bvid}/${current.cid}',
