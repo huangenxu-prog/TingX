@@ -147,6 +147,7 @@ class ListeningSession extends BaseAudioHandler {
     int offset = 0,
   }) async {
     if (busy || at < 0 || at >= parts.length) return;
+    final startupClock = Stopwatch()..start();
     busy = true;
     error = null;
     revision.value++;
@@ -167,20 +168,29 @@ class ListeningSession extends BaseAudioHandler {
         if (refresh > 0) {
           await Future<void>.delayed(const Duration(milliseconds: 500));
         }
+        final sourceClock = Stopwatch()..start();
         final sources = await chapterSources(selected.bvid, current.cid);
-        for (final source in sources) {
+        debugPrint('[TingX] source lookup: cid=${current.cid}, '
+            'attempt=$refresh, elapsed=${sourceClock.elapsedMilliseconds}ms, '
+            'candidates=${sources.length}');
+        for (var candidate = 0; candidate < sources.length; candidate++) {
+          final source = sources[candidate];
+          final loadClock = Stopwatch()..start();
           try {
             await audio.setAudioSource(
               source,
               initialPosition: Duration(milliseconds: offset),
-            );
+            ).timeout(const Duration(seconds: 8));
+            debugPrint('[TingX] source opened: cid=${current.cid}, '
+                'candidate=$candidate, elapsed=${loadClock.elapsedMilliseconds}ms');
             opened = true;
             break;
           } catch (e) {
             lastError = e;
             debugPrint(
               '[TingX] audio open failed: chapter=${current.cid}, '
-              'refresh=$refresh, error=$e',
+              'refresh=$refresh, candidate=$candidate, '
+              'elapsed=${loadClock.elapsedMilliseconds}ms, error=$e',
             );
           }
         }
@@ -206,9 +216,13 @@ class ListeningSession extends BaseAudioHandler {
       ready = true;
       await save();
       await _startPlayback();
+      debugPrint('[TingX] startup ready: cid=${current.cid}, '
+          'elapsed=${startupClock.elapsedMilliseconds}ms');
     } catch (e) {
       ready = false;
       error = '本章播放失败：$e';
+      debugPrint('[TingX] startup failed: '
+          'elapsed=${startupClock.elapsedMilliseconds}ms, error=$e');
     } finally {
       busy = false;
       publish();
