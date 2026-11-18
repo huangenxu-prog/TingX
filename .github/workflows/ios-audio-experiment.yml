@@ -8,6 +8,9 @@ on:
       - 'ios/**'
       - 'pubspec.yaml'
       - '.github/workflows/ios-audio-experiment.yml'
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 jobs:
   ios-audio-build:
