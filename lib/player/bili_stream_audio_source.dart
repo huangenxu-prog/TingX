@@ -69,6 +69,12 @@ class BiliStreamAudioSource extends StreamAudioSource {
           ? 'audio/mp4'
           : mime;
       final responseLength = response.contentLength;
+      if (response.statusCode == HttpStatus.partialContent &&
+          responseLength >= 0 &&
+          totalLength != null &&
+          offset + responseLength > totalLength) {
+        throw const FormatException('Audio range exceeds source length');
+      }
       return StreamAudioResponse(
         sourceLength: totalLength,
         contentLength: responseLength < 0 ? null : responseLength,
