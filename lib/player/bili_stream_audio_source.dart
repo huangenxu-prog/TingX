@@ -22,14 +22,25 @@ class BiliStreamAudioSource extends StreamAudioSource {
   final int trackId;
   final int bandwidth;
 
+  HttpClient? _client;
+  bool _closed = false;
+
+  void close() {
+    _closed = true;
+    _client?.close(force: true);
+    _client = null;
+  }
+
   @override
   Future<StreamAudioResponse> request([int? start, int? end]) async {
     final begin = start ?? 0;
     if (begin < 0 || (end != null && end <= begin)) {
       throw RangeError('Invalid audio byte range');
     }
-    final client = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 12);
+    if (_closed) throw StateError('Audio source has been closed');
+    final client = _client ??= (HttpClient()
+      ..connectionTimeout = const Duration(seconds: 12));
+    HttpClientResponse? pending;
     try {
       final req = await client.getUrl(uri);
       req.headers.set(HttpHeaders.refererHeader, referer);
@@ -39,6 +50,7 @@ class BiliStreamAudioSource extends StreamAudioSource {
         req.headers.set(HttpHeaders.rangeHeader, 'bytes=$begin-$last');
       }
       final response = await req.close();
+      pending = response;
       if (response.statusCode != HttpStatus.ok &&
           response.statusCode != HttpStatus.partialContent) {
         throw HttpException(
@@ -103,10 +115,9 @@ class BiliStreamAudioSource extends StreamAudioSource {
         stream: response,
         contentType: contentType,
       );
-    } finally {
-      // StreamAudioResponse owns the response stream. Do not force-close the
-      // client here: doing so would truncate playback after request() returns.
-      client.close();
+    } catch (_) {
+      if (pending != null) await pending.listen((_) {}).cancel();
+      rethrow;
     }
   }
 }

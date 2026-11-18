@@ -142,6 +142,7 @@ class ListeningSession extends BaseAudioHandler {
   bool busy = false;
   bool ready = false;
   bool completingChapter = false;
+  BiliStreamAudioSource? _activeStream;
   String? error;
   final startupDetails = <String>[];
   Timer? sleep;
@@ -226,6 +227,8 @@ class ListeningSession extends BaseAudioHandler {
       await save();
       ready = false;
       await audio.stop();
+      _activeStream?.close();
+      _activeStream = null;
       book = selected;
       chapters = parts;
       index = at;
@@ -272,10 +275,12 @@ class ListeningSession extends BaseAudioHandler {
             debugPrint('[TingX] source opened: cid=${current.cid}, '
                 'candidate=$candidate, elapsed=${loadClock.elapsedMilliseconds}ms');
             startupDetails.add('打开音轨 ${source is BiliStreamAudioSource ? source.trackId : candidate} 成功 ${loadClock.elapsedMilliseconds} ms');
+            if (source is BiliStreamAudioSource) _activeStream = source;
             opened = true;
             break;
           } catch (e) {
             startupDetails.add('打开音轨 ${source is BiliStreamAudioSource ? source.trackId : candidate} 失败 ${loadClock.elapsedMilliseconds} ms');
+            if (source is BiliStreamAudioSource) source.close();
             lastError = e;
             if (source is BiliStreamAudioSource) {
               attempts.add('${source.trackId}/${source.bandwidth ~/ 1000}k ${loadClock.elapsedMilliseconds}ms');

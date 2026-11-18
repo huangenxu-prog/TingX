@@ -6,7 +6,9 @@ import 'package:tingx/player/bili_stream_audio_source.dart';
 void main() {
   test('returns correct byte range and total length', () async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    final ports = <int>{};
     server.listen((request) async {
+      ports.add(request.connectionInfo!.remotePort);
       expect(request.headers.value(HttpHeaders.rangeHeader), 'bytes=2-5');
       request.response.statusCode = HttpStatus.partialContent;
       request.response.headers.set(
@@ -24,12 +26,16 @@ void main() {
         referer: 'https://www.bilibili.com/',
         userAgent: 'TingX-test',
       );
+      addTearDown(source.close);
       final result = await source.request(2, 6);
       expect(result.offset, 2);
       expect(result.sourceLength, 10);
       expect(result.contentLength, 4);
       expect(result.contentType, 'audio/mp4');
       expect(await result.stream.expand((bytes) => bytes).toList(), [2, 3, 4, 5]);
+      final repeated = await source.request(2, 6);
+      await repeated.stream.drain<void>();
+      expect(ports.length, 1);
     } finally {
       await server.close(force: true);
     }
