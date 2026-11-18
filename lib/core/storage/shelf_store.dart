@@ -275,6 +275,9 @@ class ShelfStore extends ChangeNotifier {
     if (existing == null || cid == 0) return;
     if (existing.doneCids.contains(cid)) return;
     existing.doneCids.add(cid);
+    // A completed chapter counts as 100% even if the last periodic save
+    // occurred several seconds before the audio ended.
+    existing.chapterProgress[cid] = 1.0;
     // 上限保护：只保留最近 800 条，避免极端长篇把本地存储撑爆
     if (existing.doneCids.length > 800) {
       existing.doneCids = existing.doneCids.sublist(
