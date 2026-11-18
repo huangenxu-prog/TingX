@@ -26,4 +26,7 @@ Retain upstream copyright, license, and attribution when importing or adapting c
 6. Build only when code compiles; report actual CI result, not assumptions.
 
 ## Current status
-Planning and upstream README/pubspec/main.dart inspection completed. Upstream source not yet imported. iOS build not yet attempted.
+
+The isolated upstream iOS simulator probe reached Xcode and failed on a duplicate UmengCommonSdkPlugin declaration (Actions run 44216973352). Static analysis in that probe was allowed to fail.
+
+Imported the upstream Bilibili network client, search/detail/stream service, and book, chapter, and audio models with attribution. The TingX package currently contains the data layer only. The runner, player integration, TingX UI, and end-to-end playback verification are pending.
