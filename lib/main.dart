@@ -143,7 +143,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     return LayoutBuilder(builder:(context,size)=>Column(mainAxisAlignment:MainAxisAlignment.center,children:[
       Padding(padding:const EdgeInsets.symmetric(horizontal:14),child:AspectRatio(aspectRatio:16/9,child:ClipRRect(borderRadius:BorderRadius.circular(12),clipBehavior:Clip.antiAlias,child:SizedBox.expand(child:b.pic.isEmpty ? cover(b) : Image.network(b.pic,fit:BoxFit.cover,errorBuilder:(_,__,___)=>cover(null)))))),
       const SizedBox(height:24),
-      SizedBox(height:(size.maxHeight*.43).clamp(182.0,318.0),child:FittedBox(fit:BoxFit.scaleDown,child:SizedBox(width:size.maxWidth,child:Column(children:[
+      SizedBox(height:(size.maxHeight*.49).clamp(230.0,360.0),child:FittedBox(fit:BoxFit.scaleDown,child:SizedBox(width:size.maxWidth,child:Column(children:[
         const SizedBox(height:8),
         Text(shortTitle(b),maxLines:1,overflow:TextOverflow.ellipsis,style:display.copyWith(fontSize:22)),
         Text(b.author,maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(color:brown)),
@@ -173,7 +173,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
             );
           },
         ),
-        Row(
+        IconTheme(data: const IconThemeData(size: 32), child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             IconButton(
@@ -184,7 +184,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
             IconButton(tooltip:'后退15秒',onPressed: player.rewind,icon:const _SkipIcon(Icons.replay),),
             IconButton.filled(
               tooltip: player.audio.state.playing ? '暂停' : '播放',
-              style:IconButton.styleFrom(backgroundColor:brown,fixedSize:const Size(64,64)),
+              style:IconButton.styleFrom(backgroundColor:brown,fixedSize:const Size(78,78),iconSize:36),
               onPressed: idle ? ()=>resume(b) : player.ready
                   ? (player.audio.state.playing ? player.pause : player.play)
                   : null,
@@ -202,7 +202,8 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
               icon: const Icon(Icons.skip_next),
             ),
           ],
-        ),
+        )),
+        const SizedBox(height:22),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
