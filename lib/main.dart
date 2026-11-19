@@ -141,7 +141,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     if(b==null)return Center(child:TextButton(onPressed:()=>setState(()=>tab=1),child:const Text('去发现有声书')));
     final idle=player.book==null;
     return LayoutBuilder(builder:(context,size)=>Column(children:[
-      Expanded(child:SizedBox.expand(child:cover(b))),
+      Expanded(child:Center(child:AspectRatio(aspectRatio:16/9,child:cover(b)))),
       SizedBox(height:(size.maxHeight*.43).clamp(182.0,318.0),child:FittedBox(fit:BoxFit.scaleDown,child:SizedBox(width:size.maxWidth,child:Column(children:[
         const SizedBox(height:8),
         Text(shortTitle(b),maxLines:1,overflow:TextOverflow.ellipsis,style:display.copyWith(fontSize:22)),
@@ -253,7 +253,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       if(recent!=null)...[
         const SizedBox(height:16),Text('继续收听',style:display.copyWith(fontSize:21)),
         Card(color:const Color(0xfffff9f2),child:Padding(padding:const EdgeInsets.all(10),child:Row(children:[
-          SizedBox(width:78,height:108,child:BookJacket(recent.book)),const SizedBox(width:14),
+          SizedBox(width:112,height:63,child:BookJacket(recent.book)),const SizedBox(width:14),
           Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(shortTitle(recent.book),maxLines:1,overflow:TextOverflow.ellipsis,style:display.copyWith(fontSize:18)),
             Text('${recent.book.author} · 第${recent.lastChapterIndex+1}章',maxLines:1,overflow:TextOverflow.ellipsis),
             const SizedBox(height:8),LinearProgressIndicator(value:recent.chapterDurationMs>0?(recent.positionMs/recent.chapterDurationMs).clamp(0.0,1.0):0),
@@ -263,7 +263,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
         Padding(padding: const EdgeInsets.symmetric(vertical: 36),
           child: Center(child: Text(['书架还是空的','还没有正在听的书','还没有听完的书'][filter])))
       else GridView.builder(shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),itemCount:entries.length,
-       gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:3,childAspectRatio:.54,crossAxisSpacing:12,mainAxisSpacing:14),
+       gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:2,childAspectRatio:1.28,crossAxisSpacing:12,mainAxisSpacing:14),
        itemBuilder:(_,i){
         final entry = entries[i];
         return InkWell(
@@ -343,7 +343,7 @@ Widget cover(Book? b) {
     borderRadius: BorderRadius.circular(8),
     child: Image.network(
       b.pic,
-      fit: BoxFit.cover,
+      fit: BoxFit.contain,
       errorBuilder: (_, _, _) => fallback,
     ),
   );
@@ -489,7 +489,7 @@ class _DetailState extends State<Detail> {
           itemBuilder: (_, row) {
             if (row == 0) return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
-                Container(width: 112, height: 145, margin: const EdgeInsets.only(left: 6),
+                Container(width: 160, height: 90, margin: const EdgeInsets.only(left: 6),
                   decoration: const BoxDecoration(boxShadow: [
                     BoxShadow(color: Color(0x55442b18), blurRadius: 8, offset: Offset(-2,5))
                   ]),
