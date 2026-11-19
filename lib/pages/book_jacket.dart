@@ -19,15 +19,18 @@ class BookJacket extends StatelessWidget {
     );
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
-      child: SizedBox.expand(
+      child: ColoredBox(
+        color: ivory,
+        child: SizedBox.expand(
         child: url.isEmpty
             ? unavailable
             : Image.network(
                 url,
-                fit: BoxFit.contain,
+                fit: BoxFit.cover,
                 semanticLabel: shortTitle(book),
                 errorBuilder: (_, __, ___) => unavailable,
               ),
+        ),
       ),
     );
   }
