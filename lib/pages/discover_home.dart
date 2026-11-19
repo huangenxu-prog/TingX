@@ -8,15 +8,6 @@ import '../services/bili_api.dart';
 
 const _ink = Color(0xff483427);
 const _accent = Color(0xff965b35);
-const _categories = [
-  ('热门推荐', Icons.local_fire_department_outlined, '有声小说'),
-  ('广播剧', Icons.headphones_outlined, '广播剧'),
-  ('评书', Icons.record_voice_over_outlined, '评书'),
-  ('相声', Icons.theater_comedy_outlined, '相声'),
-  ('悬疑', Icons.visibility_outlined, '悬疑 有声小说'),
-  ('玄幻仙侠', Icons.auto_awesome_outlined, '玄幻仙侠 有声小说'),
-];
-
 class DiscoverHome extends StatefulWidget {
   const DiscoverHome({super.key, required this.openBook, required this.listen});
   final ValueChanged<Book> openBook;
@@ -30,6 +21,7 @@ class _DiscoverHomeState extends State<DiscoverHome> {
   final search = TextEditingController();
   final scroll = ScrollController();
   final books = <Book>[];
+  final categoriesSeen = <String>['热门推荐'];
   int category = 0;
   String query = '';
   int generation = 0;
@@ -76,7 +68,7 @@ class _DiscoverHomeState extends State<DiscoverHome> {
     try {
       var raw = 0;
       final list = await BiliApi.instance.search(
-        query.isEmpty ? _categories[category].$3 : query,
+        query.isNotEmpty ? query : category == 0 ? '有声小说' : '${categoriesSeen[category]} 有声小说',
         page: next,
         order: query.isEmpty && category == 0 ? 'click' : null,
         onRawCount: (n) => raw = n,
@@ -84,7 +76,16 @@ class _DiscoverHomeState extends State<DiscoverHome> {
       if (!mounted || id != generation) return;
       final seen = books.map((book) => book.bvid).toSet();
       setState(() {
-        books.addAll(list.where((book) => seen.add(book.bvid)));
+        if (query.isEmpty && category == 0) {
+          for (final book in list) {
+            for (final genre in book.genres) {
+              if (!categoriesSeen.contains(genre)) categoriesSeen.add(genre);
+            }
+          }
+        }
+        books.addAll(list.where((book) =>
+            (query.isNotEmpty || category == 0 || book.genres.contains(categoriesSeen[category])) &&
+            seen.add(book.bvid)));
         page = next;
         more = raw >= 20;
       });
@@ -98,8 +99,8 @@ class _DiscoverHomeState extends State<DiscoverHome> {
   Widget categories() => SingleChildScrollView(
     scrollDirection: Axis.horizontal,
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-    child: Row(children: List.generate(_categories.length, (i) {
-      final (title, _, _) = _categories[i];
+    child: Row(children: List.generate(categoriesSeen.length, (i) {
+      final title = categoriesSeen[i];
       final selected = query.isEmpty && category == i;
       final color = selected ? Colors.white : _ink;
       return Padding(padding: const EdgeInsets.only(right: 6), child: Semantics(
@@ -134,7 +135,7 @@ class _DiscoverHomeState extends State<DiscoverHome> {
 
   @override
   Widget build(BuildContext context) {
-    final heading = query.isNotEmpty ? '搜索结果' : category == 0 ? '热门榜单' : _categories[category].$1;
+    final heading = query.isNotEmpty ? '搜索结果' : category == 0 ? '热门榜单' : categoriesSeen[category];
     final featured = category == 0 && query.isEmpty && books.isNotEmpty;
     return DecoratedBox(decoration: const BoxDecoration(gradient: LinearGradient(
       begin: Alignment.topCenter, end: Alignment.bottomCenter,
@@ -152,7 +153,7 @@ class _DiscoverHomeState extends State<DiscoverHome> {
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(26))))),
         categories(),
         Padding(padding: const EdgeInsets.fromLTRB(14, 2, 4, 0), child: Row(children: [
-          Icon(query.isEmpty ? _categories[category].$2 : Icons.search, size: 17, color: _accent),
+          Icon(query.isEmpty ? (category == 0 ? Icons.local_fire_department_outlined : Icons.category_outlined) : Icons.search, size: 17, color: _accent),
           const SizedBox(width: 5),
           Expanded(child: Text(heading, style: const TextStyle(fontSize: 18, color: _ink, fontWeight: FontWeight.w600))),
           Text('${books.length} 个结果', style: const TextStyle(color: _ink, fontSize: 12)),
