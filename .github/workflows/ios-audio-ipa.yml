@@ -40,4 +40,4 @@ jobs:
           path: build/ipa/TingX-Audio-Experimental-unsigned.ipa
           if-no-files-found: error
 
-# Rebuild request: remove discovery ranking badges 6a6178e
+# Rebuild request: single-line directory 192d266
