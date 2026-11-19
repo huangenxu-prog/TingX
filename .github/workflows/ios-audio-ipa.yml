@@ -40,4 +40,4 @@ jobs:
           path: build/ipa/TingX-Audio-Experimental-unsigned.ipa
           if-no-files-found: error
 
-# Rebuild request: rounded player cover f329677
+# Rebuild request: player artwork actual clip d438b0a
