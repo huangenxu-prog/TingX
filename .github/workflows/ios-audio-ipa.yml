@@ -40,4 +40,4 @@ jobs:
           path: build/ipa/TingX-Audio-Experimental-unsigned.ipa
           if-no-files-found: error
 
-# Rebuild request: restore white playback icon 9188445
+# Rebuild request: retry unsigned IPA after 191e65f color fix - attempt 2
