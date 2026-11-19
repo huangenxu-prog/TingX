@@ -188,7 +188,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
               onPressed: idle ? ()=>resume(b) : player.ready
                   ? (player.audio.state.playing ? player.pause : player.play)
                   : null,
-              icon: Icon(player.audio.state.playing ? Icons.pause : Icons.play_arrow),
+              icon: Icon(player.audio.state.playing ? Icons.pause : Icons.play_arrow, color: Colors.white),
             ),
             IconButton(tooltip:'前进15秒',
               onPressed: player.fastForward,
