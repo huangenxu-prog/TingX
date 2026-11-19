@@ -21,7 +21,8 @@ const _categories = <({String label, List<String> keywords})>[
   (label: '言情', keywords: ['言情 有声小说']),
   (label: '穿越重生', keywords: ['穿越 有声小说', '重生 有声小说']),
   (label: '军事', keywords: ['军事 有声小说']),
-  (label: '儿童名著', keywords: ['儿童 有声书', '世界名著 朗读']),
+  (label: '儿童', keywords: ['儿童 有声书']),
+  (label: '名著', keywords: ['世界名著 朗读']),
 ];
 
 class DiscoverHome extends StatefulWidget {
