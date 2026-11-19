@@ -40,4 +40,4 @@ jobs:
           path: build/ipa/TingX-Audio-Experimental-unsigned.ipa
           if-no-files-found: error
 
-# Rebuild request: catalog and sleep timer a90e6e1
+# Rebuild request: genre filters and audiobook titles 5b25f08
