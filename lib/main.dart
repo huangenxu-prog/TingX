@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
@@ -13,7 +14,6 @@ import 'pages/book_jacket.dart';
 import 'package:flutter/services.dart';
 import 'models/chapter.dart';
 import 'player/listening_session.dart';
-import 'player/playback_comparison.dart';
 import 'services/bili_api.dart';
 
 Future<void> main() async {
@@ -223,13 +223,21 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
             PopupMenuButton<int>(
               onSelected: player.setSleep,
               itemBuilder: (_) => [
-                for (final m in [0, 15, 30, 60])
+                for (final m in [0, 15, 30, 60, 90, 120])
                   PopupMenuItem(
                     value: m,
                     child: Text(m == 0 ? '关闭定时' : '$m 分钟'),
                   ),
               ],
-              child: const Column(children:[Icon(Icons.schedule),Text('睡眠定时')]),
+              child: Column(children: [
+                const Icon(Icons.schedule),
+                ValueListenableBuilder<DateTime?>(
+                  valueListenable: player.sleepDeadline,
+                  builder: (_, deadline, __) => deadline == null
+                      ? const Text('睡眠定时')
+                      : _SleepCountdown(deadline),
+                ),
+              ]),
             ),
           ],
         ),
@@ -251,10 +259,12 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
             const SizedBox(height:8),LinearProgressIndicator(value:recent.chapterDurationMs>0?(recent.positionMs/recent.chapterDurationMs).clamp(0.0,1.0):0),
             Row(children:[Expanded(child:Text('${recent.positionText} / ${clock(recent.chapterDurationMs~/1000)}')),IconButton.filled(onPressed:()=>resume(recent.book),icon:const Icon(Icons.play_arrow))])]))])))],
       const SizedBox(height:16),Row(children:[Expanded(child:Text('我的书架',style:display.copyWith(fontSize:21))),Text('${entries.length} 本')]),const SizedBox(height:12),
-      GridView.builder(shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),itemCount:entries.length+1,
+      if (entries.isEmpty)
+        Padding(padding: const EdgeInsets.symmetric(vertical: 36),
+          child: Center(child: Text(['书架还是空的','还没有正在听的书','还没有听完的书'][filter])))
+      else GridView.builder(shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),itemCount:entries.length,
        gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:3,childAspectRatio:.54,crossAxisSpacing:12,mainAxisSpacing:14),
        itemBuilder:(_,i){
-        if(i==entries.length)return InkWell(onTap:()=>setState(()=>tab=1),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Expanded(child:Container(alignment:Alignment.center,decoration:BoxDecoration(border:Border.all(color:Colors.brown.shade200),borderRadius:BorderRadius.circular(12)),child:const Icon(Icons.add))),const Text('去发现')]));
         final entry = entries[i];
         return InkWell(
           onTap: () => details(entry.book),
@@ -301,24 +311,9 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
               icon: const Icon(Icons.more_horiz,color:Colors.white),
               itemBuilder: (_) => const [
                 PopupMenuItem(value: 'settings', child: Text('设置')),
-                if (ListeningSession.experimentalStream)
-                  PopupMenuItem(value: 'compare', child: Text('同源播放对照')),
-                PopupMenuItem(value: 'timing', child: Text('起播耗时')),
               ],
-              onSelected: (value) async {
-                if (value == 'compare') {
-                  await comparePlayback(context, player);
-                  return;
-                }
-                if (value == 'settings') {
-                  Navigator.push<void>(context, MaterialPageRoute(builder: (_) => const TingXSettings()));
-                  return;
-                }
-                showDialog<void>(context: context, builder: (_) => AlertDialog(
-                  title: const Text('本次起播耗时'),
-                  content: SelectableText(player.startupDetails.isEmpty ? '暂无记录' : player.startupDetails.join('\n')),
-                ));
-              },
+              onSelected: (_) => Navigator.push<void>(context,
+                MaterialPageRoute(builder: (_) => const TingXSettings())),
             ),
         ],
       ),
@@ -382,6 +377,47 @@ String partLabel(String value){
   return match==null?value:'第${int.parse(match[1]!)}–${int.parse(match[2]!)}集';
 }
 
+class _SleepCountdown extends StatefulWidget {
+  const _SleepCountdown(this.deadline);
+  final DateTime deadline;
+  @override
+  State<_SleepCountdown> createState() => _SleepCountdownState();
+}
+
+class _SleepCountdownState extends State<_SleepCountdown> {
+  late final Timer ticker;
+  @override
+  void initState() {
+    super.initState();
+    ticker = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
+  }
+  @override
+  void dispose() {
+    ticker.cancel();
+    super.dispose();
+  }
+  @override
+  Widget build(BuildContext context) {
+    final ms = widget.deadline.difference(DateTime.now()).inMilliseconds;
+    return Text(clock(ms > 0 ? (ms + 999) ~/ 1000 : 0));
+  }
+}
+
+class _PaperGrain extends CustomPainter {
+  const _PaperGrain();
+  @override
+  void paint(Canvas canvas, Size size) {
+    final random = math.Random(42);
+    final grain = Paint()..color = const Color(0x10856946);
+    for (var n = 0; n < size.width * size.height / 20; n++) {
+      canvas.drawCircle(Offset(random.nextDouble() * size.width,
+          random.nextDouble() * size.height), .45, grain);
+    }
+  }
+  @override
+  bool shouldRepaint(_PaperGrain oldDelegate) => false;
+}
+
 class Detail extends StatefulWidget {
   final Book book;
   const Detail(this.book, {super.key});
@@ -406,14 +442,17 @@ class _DetailState extends State<Detail> {
   }
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(actions:[ListenableBuilder(listenable:ShelfStore.instance,builder:(_,__){
+    appBar: AppBar(backgroundColor: ivory, surfaceTintColor: Colors.transparent,
+      flexibleSpace: const CustomPaint(painter: _PaperGrain()), actions:[ListenableBuilder(listenable:ShelfStore.instance,builder:(_,__){
       final b=widget.book;
       final on=ShelfStore.instance.isOnShelf(b.bvid);
       return IconButton(tooltip:on?'移出书架':'加入书架',icon:Icon(on?Icons.bookmark:Icons.bookmark_border,color:brown),onPressed:() async {
         if(on){await confirmRemoval(context,b);}else{await ShelfStore.instance.add(b);final data=await info;await ShelfStore.instance.setTotalChapters(b.bvid,data.$2.length);}
       });
     })]),
-    body: FutureBuilder(
+    body: Stack(children: [
+      const Positioned.fill(child: RepaintBoundary(child: CustomPaint(painter: _PaperGrain()))),
+      Positioned.fill(child: FutureBuilder(
       future: info,
       builder: (_, snapshot) {
         if (snapshot.hasError)
@@ -436,23 +475,82 @@ class _DetailState extends State<Detail> {
           i,
           i == last ? saved!.positionMs : 0,
         ));
-        return ListView.builder(padding:const EdgeInsets.fromLTRB(18,6,18,30),itemCount:parts.length+1,itemBuilder:(_,row){
-          if(row==0)return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-            Row(children:[SizedBox(width:112,height:155,child:cover(b)),const SizedBox(width:16),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-              Text(shortTitle(b),maxLines:3,overflow:TextOverflow.ellipsis,style:const TextStyle(fontFamily:'Songti SC',fontSize:26,color:Color(0xff402a1c),fontWeight:FontWeight.bold)),
-              if(b.cleanTitle.contains('完结') && !b.cleanTitle.contains('未完结'))const Text(' 完结 ',style:TextStyle(color:Colors.white,backgroundColor:Color(0xff9d4739),fontSize:12)),
-              const SizedBox(height:8),if(b.author.isNotEmpty)Text('上传者：${b.author}',style:const TextStyle(color:brown)),if(RegExp(r'\d+集').hasMatch(b.cleanTitle))Text(RegExp(r'\d+集').firstMatch(b.cleanTitle)![0]!)
-            ]))]),
-            if(b.desc.isNotEmpty || synopsis.isNotEmpty) Padding(padding:const EdgeInsets.symmetric(vertical:12),child:InkWell(onTap:()=>setState(()=>expanded=!expanded),child:Column(crossAxisAlignment:CrossAxisAlignment.end,children:[Text(b.desc.isEmpty?synopsis:b.desc,maxLines:expanded?null:2,overflow:expanded?null:TextOverflow.ellipsis),Text(expanded?'收起':'展开',style:const TextStyle(color:brown))]))),
-            const SizedBox(height:12),Center(child:Wrap(spacing:12,crossAxisAlignment:WrapCrossAlignment.center,children:[FilledButton.icon(style:FilledButton.styleFrom(backgroundColor:brown),onPressed:()=>choose(last<0?0:last),icon:const Icon(Icons.play_arrow),label:Text(last<0?'开始收听':'继续收听')),
-            if(last>=0)Text('${partLabel(parts[last].part)} · 已听 ${saved!.positionText}',style:const TextStyle(fontSize:12))])),
-            const Divider(height:30),Text('收听目录   ·   ${parts.length} 个分段',style:const TextStyle(fontFamily:'Songti SC',fontSize:19,color:Color(0xff402a1c))),const SizedBox(height:8)
-          ]);
-          final i=row-1;
-          return Container(decoration:const BoxDecoration(border:Border(bottom:BorderSide(color:Color(0xffe7ded1),width:.5))),child:ListTile(dense:true,contentPadding:const EdgeInsets.symmetric(horizontal:5),selected:i==last,selectedColor:brown,
-            leading:i==last?Container(width:3,height:18,color:brown):null,title:Text(partLabel(parts[i].part)),trailing:Text('${done.contains(parts[i].cid)?"✓  ":""}${parts[i].durationText}'),onTap:()=>choose(i)));
-        });
+        const ink = Color(0xff422c20);
+        const rule = Color(0xffddcdbb);
+        const type = TextStyle(fontFamily: 'Songti SC', color: ink);
+        final total = RegExp(r'(?:全|共)?\s*(\d+)\s*集').firstMatch(b.cleanTitle);
+        final complete = b.cleanTitle.contains('完结') && !b.cleanTitle.contains('未完结');
+        final description = b.desc.trim().isEmpty ? synopsis : b.desc.trim();
+        Widget marker() => Container(width: 3, height: 20,
+          decoration: BoxDecoration(color: brown, borderRadius: BorderRadius.circular(2)));
+        return ListView.builder(
+          padding: const EdgeInsets.fromLTRB(18, 6, 18, 32),
+          itemCount: parts.length + 1,
+          itemBuilder: (_, row) {
+            if (row == 0) return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Container(width: 112, height: 145, margin: const EdgeInsets.only(left: 6),
+                  decoration: const BoxDecoration(boxShadow: [
+                    BoxShadow(color: Color(0x55442b18), blurRadius: 8, offset: Offset(-2,5))
+                  ]),
+                  child: Stack(fit: StackFit.expand, children: [
+                    BookJacket(b),
+                    Positioned(left: 4, top: 5, bottom: 5, child: Container(width: 5,
+                      decoration: const BoxDecoration(gradient: LinearGradient(
+                        colors: [Colors.black38, Colors.white24, Colors.transparent])))),
+                  ])),
+                const SizedBox(width: 16),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Wrap(spacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                    Text(shortTitle(b), style: type.copyWith(fontSize: 30,fontWeight: FontWeight.bold)),
+                    if (complete) Container(padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
+                      decoration: BoxDecoration(color: const Color(0xff9d382e), borderRadius: BorderRadius.circular(4)),
+                      child: const Text('完\n结',style: TextStyle(color: Colors.white,fontSize: 11,height: 1))),
+                  ]),
+                  const SizedBox(height: 9),
+                  if (b.author.isNotEmpty) Text('上传者：${b.author}',style: type),
+                  if (total != null) Text('全 ${total[1]}集',style: type),
+                ])),
+              ]),
+              if (description.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 15),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.end,children: [
+                  Expanded(child: Text(description,maxLines: expanded ? null : 2,
+                    overflow: expanded ? null : TextOverflow.ellipsis,style: type.copyWith(height: 1.5))),
+                  TextButton(onPressed: () => setState(() => expanded = !expanded),
+                    child: Text(expanded ? '收起 ⌃' : '展开 ﹀',style: type.copyWith(color: brown))),
+                ])),
+              const SizedBox(height: 18),
+              Row(children: [
+                FilledButton.icon(style: FilledButton.styleFrom(backgroundColor: brown,
+                  minimumSize: const Size(158,42)),onPressed: () => choose(last < 0 ? 0 : last),
+                  icon: const Icon(Icons.play_arrow),label: Text(last < 0 ? '开始收听' : '继续收听')),
+                if (last >= 0) ...[
+                  Container(width: 1,height: 18,margin: const EdgeInsets.symmetric(horizontal: 10),color: rule),
+                  Expanded(child: Text('上次听到第${last+1}章 · ${saved!.positionText}',style: type.copyWith(fontSize: 13))),
+                ],
+              ]),
+              const Divider(height: 40,color: rule,thickness: .6),
+              Row(children: [marker(),const SizedBox(width: 12),
+                Text('收听目录',style: type.copyWith(fontSize: 21,fontWeight: FontWeight.bold)),
+                const SizedBox(width: 18),Text('${parts.length}个分段',style: type)]),
+              const SizedBox(height: 12),
+            ]);
+            final i = row - 1;
+            final selected = i == (last < 0 ? 0 : last);
+            return InkWell(onTap: () => choose(i), child: Container(
+              constraints: const BoxConstraints(minHeight: 44),
+              decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: rule,width: .5))),
+              child: Row(children: [
+                SizedBox(width: 3,child: selected ? marker() : null),
+                const SizedBox(width: 13),
+                Expanded(child: Text(partLabel(parts[i].part),style: type.copyWith(
+                  fontSize: 17,color: selected ? brown : ink))),
+                Text('${done.contains(parts[i].cid) ? "✓  " : ""}${parts[i].durationText}',style: type),
+              ]),
+            ));
+          },
+        );
       },
-    ),
+    )),]),
   );
 }

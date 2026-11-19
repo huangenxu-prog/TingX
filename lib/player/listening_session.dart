@@ -152,6 +152,7 @@ class ListeningSession extends BaseAudioHandler {
   String? error;
   final startupDetails = <String>[];
   Timer? sleep;
+  final sleepDeadline = ValueNotifier<DateTime?>(null);
   Chapter? get chapter => chapters.elementAtOrNull(index);
 
   Future<void> initialize() async {
@@ -435,6 +436,13 @@ class ListeningSession extends BaseAudioHandler {
 
   void setSleep(int minutes) {
     sleep?.cancel();
-    if (minutes > 0) sleep = Timer(Duration(minutes: minutes), pause);
+    final duration = Duration(minutes: minutes);
+    sleepDeadline.value = minutes > 0 ? DateTime.now().add(duration) : null;
+    if (minutes > 0) {
+      sleep = Timer(duration, () {
+        sleepDeadline.value = null;
+        pause();
+      });
+    }
   }
 }
