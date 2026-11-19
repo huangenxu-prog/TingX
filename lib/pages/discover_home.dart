@@ -94,7 +94,15 @@ class _DiscoverHomeState extends State<DiscoverHome> {
             onRawCount: (n) => rawCounts[i] = n,
           ),
       ]);
-      final list = batches.expand((batch) => batch).toList();
+      // Interleave independently searched categories rather than putting all
+      // results from the first keyword ahead of the second.
+      final list = <Book>[];
+      final longest = batches.fold<int>(0, (n, batch) => batch.length > n ? batch.length : n);
+      for (var offset = 0; offset < longest; offset++) {
+        for (final batch in batches) {
+          if (offset < batch.length) list.add(batch[offset]);
+        }
+      }
       if (!mounted || id != generation) return;
       final seen = books.map((book) => book.bvid).toSet();
       setState(() {
