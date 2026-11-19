@@ -40,4 +40,4 @@ jobs:
           path: build/ipa/TingX-Audio-Experimental-unsigned.ipa
           if-no-files-found: error
 
-# Rebuild request: unified rounded book covers b1a3865
+# Rebuild request: detail chapter play icons 381d75c
