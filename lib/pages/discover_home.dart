@@ -182,18 +182,10 @@ class _DiscoverHomeState extends State<DiscoverHome> {
           IconButton(tooltip: '刷新', onPressed: () => restart(category, query),
             icon: const Icon(Icons.refresh, size: 19, color: _ink))])),
         Expanded(child: CustomScrollView(controller: scroll, slivers: [
-          if(featured) SliverToBoxAdapter(child:Container(height:148,margin:const EdgeInsets.fromLTRB(18,0,18,16),padding:const EdgeInsets.all(10),
-            decoration:BoxDecoration(color:const Color(0xfffff9f2),borderRadius:BorderRadius.circular(20),border:Border.all(color:const Color(0xffe8d8c5))),
-            child:Row(children:[SizedBox(width:84,child:GestureDetector(onTap:()=>widget.openBook(books.first),child:BookJacket(books.first))),
-              const SizedBox(width:14),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,mainAxisAlignment:MainAxisAlignment.spaceBetween,children:[
-                Text(books.first.cleanTitle.contains('多人')?'榜首 · 多人有声剧':'榜首',style:const TextStyle(color:brown,fontWeight:FontWeight.bold)),
-                GestureDetector(onTap:()=>widget.openBook(books.first),child:Text(shortTitle(books.first),maxLines:1,overflow:TextOverflow.ellipsis,style:display.copyWith(fontSize:20))),
-                Text(books.first.author,maxLines:1,overflow:TextOverflow.ellipsis),
-                IconButton.filled(tooltip:'播放',onPressed:()=>widget.listen(books.first),icon:const Icon(Icons.play_arrow))]))]))),
           SliverPadding(padding: const EdgeInsets.symmetric(horizontal: 18), sliver: SliverGrid(
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2,
               crossAxisSpacing: 12, mainAxisSpacing: 16, childAspectRatio: 1.28),
-            delegate: SliverChildBuilderDelegate((_, i) => tile(books[i+(featured?1:0)]), childCount: books.length-(featured?1:0)))),
+            delegate: SliverChildBuilderDelegate((_, i) => tile(books[i]), childCount: books.length))),
           SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.all(10), child: Center(child:
             busy ? const CircularProgressIndicator(strokeWidth: 2) :
             failed || more ? TextButton(onPressed: load, child: Text(failed ? '加载失败，点此重试' : '加载更多')) :
