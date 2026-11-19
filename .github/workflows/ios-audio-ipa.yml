@@ -40,4 +40,4 @@ jobs:
           path: build/ipa/TingX-Audio-Experimental-unsigned.ipa
           if-no-files-found: error
 
-# Rebuild request: single-line directory 192d266
+# Rebuild request: two-column landscape discovery covers d3b2660
