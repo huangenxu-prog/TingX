@@ -40,4 +40,4 @@ jobs:
           path: build/ipa/TingX-Audio-Experimental-unsigned.ipa
           if-no-files-found: error
 
-# Rebuild request: verify reverted original cover and player 16bbd2b
+# Rebuild request: player control size and spacing 41b3e96
