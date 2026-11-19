@@ -3,6 +3,7 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 
 import '../models/book.dart';
+import 'book_jacket.dart';
 import '../services/bili_api.dart';
 
 const _ink = Color(0xff483427);
@@ -17,8 +18,9 @@ const _categories = [
 ];
 
 class DiscoverHome extends StatefulWidget {
-  const DiscoverHome({super.key, required this.openBook});
+  const DiscoverHome({super.key, required this.openBook, required this.listen});
   final ValueChanged<Book> openBook;
+  final ValueChanged<Book> listen;
 
   @override
   State<DiscoverHome> createState() => _DiscoverHomeState();
@@ -97,7 +99,7 @@ class _DiscoverHomeState extends State<DiscoverHome> {
     scrollDirection: Axis.horizontal,
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
     child: Row(children: List.generate(_categories.length, (i) {
-      final (title, icon, _) = _categories[i];
+      final (title, _, _) = _categories[i];
       final selected = query.isEmpty && category == i;
       final color = selected ? Colors.white : _ink;
       return Padding(padding: const EdgeInsets.only(right: 6), child: Semantics(
@@ -107,22 +109,20 @@ class _DiscoverHomeState extends State<DiscoverHome> {
           restart(i, '');
         }, child: _Glass(selected: selected, child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
-          child: Row(children: [Icon(icon, size: 13, color: color),
+          child: Row(children: [
             const SizedBox(width: 4), Text(title, style: TextStyle(fontSize: 12, color: color))]),
         )))));
     })),
   );
 
-  Widget tile(Book b) {
+  Widget tile(Book b, int rank) {
     final title = b.cleanTitle;
     final match = RegExp(r'(?:演播|播讲|主播)[：:︰]\s*([^｜|【】《》，,。\s]+)').firstMatch('$title ${b.desc}');
     final credit = match?.group(1) ?? b.author;
-    const missing = Center(child: Icon(Icons.broken_image_outlined, color: Colors.black26));
+
     return InkWell(onTap: () => widget.openBook(b), child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(9),
-          child: b.pic.isEmpty ? missing : Image.network(b.pic, fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => missing))),
+        Expanded(child:Stack(fit:StackFit.expand,children:[BookJacket(b),if(rank>0)Positioned(left:6,top:6,child:CircleAvatar(radius:11,backgroundColor:ivory,child:Text('$rank',style:const TextStyle(color:_ink,fontSize:12))))])),
         Padding(padding: const EdgeInsets.fromLTRB(3, 5, 3, 0), child: Text(title,
           maxLines: 1, overflow: TextOverflow.ellipsis,
           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _ink))),
@@ -135,9 +135,10 @@ class _DiscoverHomeState extends State<DiscoverHome> {
   @override
   Widget build(BuildContext context) {
     final heading = query.isNotEmpty ? '搜索结果' : category == 0 ? '热门榜单' : _categories[category].$1;
+    final featured = category == 0 && query.isEmpty && books.isNotEmpty;
     return DecoratedBox(decoration: const BoxDecoration(gradient: LinearGradient(
       begin: Alignment.topCenter, end: Alignment.bottomCenter,
-      colors: [Color(0xfff5e7d9), Color(0xfffaf5ed), Color(0xfffaf6ef)],
+      colors: [ivory, ivory, ivory],
       stops: [0, .23, 1])), child: Column(children: [
         Padding(padding: const EdgeInsets.fromLTRB(14, 4, 14, 4), child: TextField(
           controller: search, textInputAction: TextInputAction.search,
@@ -158,10 +159,18 @@ class _DiscoverHomeState extends State<DiscoverHome> {
           IconButton(tooltip: '刷新', onPressed: () => restart(category, query),
             icon: const Icon(Icons.refresh, size: 19, color: _ink))])),
         Expanded(child: CustomScrollView(controller: scroll, slivers: [
-          SliverPadding(padding: const EdgeInsets.symmetric(horizontal: 12), sliver: SliverGrid(
+          if(featured) SliverToBoxAdapter(child:Container(height:148,margin:const EdgeInsets.fromLTRB(18,0,18,16),padding:const EdgeInsets.all(10),
+            decoration:BoxDecoration(color:const Color(0xfffff9f2),borderRadius:BorderRadius.circular(20),border:Border.all(color:const Color(0xffe8d8c5))),
+            child:Row(children:[SizedBox(width:84,child:GestureDetector(onTap:()=>widget.openBook(books.first),child:BookJacket(books.first))),
+              const SizedBox(width:14),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,mainAxisAlignment:MainAxisAlignment.spaceBetween,children:[
+                Text(books.first.cleanTitle.contains('多人')?'榜首 · 多人有声剧':'榜首',style:const TextStyle(color:brown,fontWeight:FontWeight.bold)),
+                GestureDetector(onTap:()=>widget.openBook(books.first),child:Text(shortTitle(books.first),maxLines:1,overflow:TextOverflow.ellipsis,style:display.copyWith(fontSize:20))),
+                Text(books.first.author,maxLines:1,overflow:TextOverflow.ellipsis),
+                IconButton.filled(tooltip:'播放',onPressed:()=>widget.listen(books.first),icon:const Icon(Icons.play_arrow))]))]))),
+          SliverPadding(padding: const EdgeInsets.symmetric(horizontal: 18), sliver: SliverGrid(
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3,
               crossAxisSpacing: 8, mainAxisSpacing: 15, childAspectRatio: .62),
-            delegate: SliverChildBuilderDelegate((_, i) => tile(books[i]), childCount: books.length))),
+            delegate: SliverChildBuilderDelegate((_, i) => tile(books[i+(featured?1:0)], featured?i+2:0), childCount: books.length-(featured?1:0)))),
           SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.all(10), child: Center(child:
             busy ? const CircularProgressIndicator(strokeWidth: 2) :
             failed || more ? TextButton(onPressed: load, child: Text(failed ? '加载失败，点此重试' : '加载更多')) :
