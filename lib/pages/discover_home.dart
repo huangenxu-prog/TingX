@@ -8,6 +8,22 @@ import '../services/bili_api.dart';
 
 const _ink = Color(0xff483427);
 const _accent = Color(0xff965b35);
+const _categories = <({String label, List<String> keywords})>[
+  (label: '热门推荐', keywords: ['有声小说']),
+  (label: '广播剧', keywords: ['广播剧 全集']),
+  (label: '评书相声', keywords: ['评书', '相声']),
+  (label: '历史', keywords: ['历史 有声小说']),
+  (label: '都市', keywords: ['都市 有声小说']),
+  (label: '悬疑灵异', keywords: ['悬疑 有声小说', '灵异 有声小说']),
+  (label: '玄幻', keywords: ['玄幻 有声小说']),
+  (label: '仙侠武侠', keywords: ['仙侠 有声小说', '武侠 有声小说']),
+  (label: '科幻', keywords: ['科幻 有声小说']),
+  (label: '言情', keywords: ['言情 有声小说']),
+  (label: '穿越重生', keywords: ['穿越 有声小说', '重生 有声小说']),
+  (label: '军事', keywords: ['军事 有声小说']),
+  (label: '儿童名著', keywords: ['儿童 有声书', '世界名著 朗读']),
+];
+
 class DiscoverHome extends StatefulWidget {
   const DiscoverHome({super.key, required this.openBook, required this.listen});
   final ValueChanged<Book> openBook;
@@ -21,7 +37,6 @@ class _DiscoverHomeState extends State<DiscoverHome> {
   final search = TextEditingController();
   final scroll = ScrollController();
   final books = <Book>[];
-  final categoriesSeen = <String>['热门推荐'];
   int category = 0;
   String query = '';
   int generation = 0;
@@ -66,28 +81,26 @@ class _DiscoverHomeState extends State<DiscoverHome> {
     final next = page + 1;
     setState(() { busy = true; failed = false; });
     try {
-      var raw = 0;
-      final list = await BiliApi.instance.search(
-        query.isNotEmpty ? query : category == 0 ? '有声小说' : '${categoriesSeen[category]} 有声小说',
-        page: next,
-        order: query.isEmpty && category == 0 ? 'click' : null,
-        onRawCount: (n) => raw = n,
-      );
+      final keywords = query.isNotEmpty
+          ? [query]
+          : _categories[category].keywords;
+      final rawCounts = List<int>.filled(keywords.length, 0);
+      final batches = await Future.wait([
+        for (var i = 0; i < keywords.length; i++)
+          BiliApi.instance.search(
+            keywords[i],
+            page: next,
+            order: query.isEmpty && category == 0 ? 'click' : null,
+            onRawCount: (n) => rawCounts[i] = n,
+          ),
+      ]);
+      final list = batches.expand((batch) => batch).toList();
       if (!mounted || id != generation) return;
       final seen = books.map((book) => book.bvid).toSet();
       setState(() {
-        if (query.isEmpty && category == 0) {
-          for (final book in list) {
-            for (final genre in book.genres) {
-              if (!categoriesSeen.contains(genre)) categoriesSeen.add(genre);
-            }
-          }
-        }
-        books.addAll(list.where((book) =>
-            (query.isNotEmpty || category == 0 || book.genres.contains(categoriesSeen[category])) &&
-            seen.add(book.bvid)));
+        books.addAll(list.where((book) => seen.add(book.bvid)));
         page = next;
-        more = raw >= 20;
+        more = rawCounts.any((count) => count >= 20);
       });
     } catch (_) {
       if (mounted && id == generation) setState(() => failed = true);
@@ -99,8 +112,8 @@ class _DiscoverHomeState extends State<DiscoverHome> {
   Widget categories() => SingleChildScrollView(
     scrollDirection: Axis.horizontal,
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-    child: Row(children: List.generate(categoriesSeen.length, (i) {
-      final title = categoriesSeen[i];
+    child: Row(children: List.generate(_categories.length, (i) {
+      final title = _categories[i].label;
       final selected = query.isEmpty && category == i;
       final color = selected ? Colors.white : _ink;
       return Padding(padding: const EdgeInsets.only(right: 6), child: Semantics(
@@ -135,7 +148,7 @@ class _DiscoverHomeState extends State<DiscoverHome> {
 
   @override
   Widget build(BuildContext context) {
-    final heading = query.isNotEmpty ? '搜索结果' : category == 0 ? '热门榜单' : categoriesSeen[category];
+    final heading = query.isNotEmpty ? '搜索结果' : category == 0 ? '热门榜单' : _categories[category].label;
     final featured = category == 0 && query.isEmpty && books.isNotEmpty;
     return DecoratedBox(decoration: const BoxDecoration(gradient: LinearGradient(
       begin: Alignment.topCenter, end: Alignment.bottomCenter,
