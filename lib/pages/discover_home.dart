@@ -191,8 +191,8 @@ class _DiscoverHomeState extends State<DiscoverHome> {
                 Text(books.first.author,maxLines:1,overflow:TextOverflow.ellipsis),
                 IconButton.filled(tooltip:'播放',onPressed:()=>widget.listen(books.first),icon:const Icon(Icons.play_arrow))]))]))),
           SliverPadding(padding: const EdgeInsets.symmetric(horizontal: 18), sliver: SliverGrid(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3,
-              crossAxisSpacing: 8, mainAxisSpacing: 15, childAspectRatio: .62),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2,
+              crossAxisSpacing: 12, mainAxisSpacing: 16, childAspectRatio: 1.28),
             delegate: SliverChildBuilderDelegate((_, i) => tile(books[i+(featured?1:0)]), childCount: books.length-(featured?1:0)))),
           SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.all(10), child: Center(child:
             busy ? const CircularProgressIndicator(strokeWidth: 2) :
