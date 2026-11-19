@@ -298,6 +298,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     const titles = ['播放器', '发现', '书架'];
     return Scaffold(
       appBar: AppBar(
+        centerTitle: tab == 1 ? false : null,
         title: Text(titles[tab]),
         actions: [
           if (tab == 0)
@@ -336,21 +337,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
           ),
         ),
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: tab,
-        onDestinationSelected: (v) => setState(() => tab = v),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.headphones), label: '播放器'),
-          NavigationDestination(
-            icon: Icon(Icons.explore_outlined),
-            label: '发现',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.library_books_outlined),
-            label: '书架',
-          ),
-        ],
-      ),
+      bottomNavigationBar: TingXTabBar(index: tab, select: (v) => setState(() => tab = v)),
     );
   }
 }

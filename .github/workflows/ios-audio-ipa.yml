@@ -5,6 +5,7 @@ on:
     branches: [experiment/audio-pipeline]
     paths:
       - 'lib/player/**'
+      - 'lib/pages/discover_home.dart'
       - '.github/workflows/ios-audio-ipa.yml'
 jobs:
   unsigned-ipa:
