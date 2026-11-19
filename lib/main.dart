@@ -140,8 +140,8 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     final b = player.book ?? recent?.book;
     if(b==null)return Center(child:TextButton(onPressed:()=>setState(()=>tab=1),child:const Text('去发现有声书')));
     final idle=player.book==null;
-    return LayoutBuilder(builder:(context,size)=>Column(children:[
-      Expanded(child:Center(child:AspectRatio(aspectRatio:16/9,child:cover(b)))),
+    return LayoutBuilder(builder:(context,size)=>Column(mainAxisAlignment:MainAxisAlignment.spaceEvenly,children:[
+      Padding(padding:const EdgeInsets.fromLTRB(14,16,14,16),child:AspectRatio(aspectRatio:16/9,child:cover(b))),
       SizedBox(height:(size.maxHeight*.43).clamp(182.0,318.0),child:FittedBox(fit:BoxFit.scaleDown,child:SizedBox(width:size.maxWidth,child:Column(children:[
         const SizedBox(height:8),
         Text(shortTitle(b),maxLines:1,overflow:TextOverflow.ellipsis,style:display.copyWith(fontSize:22)),
@@ -247,17 +247,8 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   Widget bookshelf() {
     final all=shelf.books;
     final entries=all.where((e)=>filter==0 || (filter==1 ? e.hasProgress && e.percent<1 : e.percent>=1)).toList();
-    final recent=entries.where((e)=>e.lastCid>0).firstOrNull;
     return ListView(padding:const EdgeInsets.fromLTRB(18,0,18,20),children:[
       Wrap(spacing:8,children:[for(int i=0;i<3;i++) ChoiceChip(shape:const StadiumBorder(),side:BorderSide.none,selectedColor:brown,backgroundColor:const Color(0xfff1e6d8),showCheckmark:false,label:Text(['全部','在听','已听完'][i],style:TextStyle(color:filter==i?Colors.white:brown)),selected:filter==i,onSelected:(_)=>setState(()=>filter=i))]),
-      if(recent!=null)...[
-        const SizedBox(height:16),Text('继续收听',style:display.copyWith(fontSize:21)),
-        Card(color:const Color(0xfffff9f2),child:Padding(padding:const EdgeInsets.all(10),child:Row(children:[
-          SizedBox(width:112,height:63,child:BookJacket(recent.book)),const SizedBox(width:14),
-          Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(shortTitle(recent.book),maxLines:1,overflow:TextOverflow.ellipsis,style:display.copyWith(fontSize:18)),
-            Text('${recent.book.author} · 第${recent.lastChapterIndex+1}章',maxLines:1,overflow:TextOverflow.ellipsis),
-            const SizedBox(height:8),LinearProgressIndicator(value:recent.chapterDurationMs>0?(recent.positionMs/recent.chapterDurationMs).clamp(0.0,1.0):0),
-            Row(children:[Expanded(child:Text('${recent.positionText} / ${clock(recent.chapterDurationMs~/1000)}')),IconButton.filled(onPressed:()=>resume(recent.book),icon:const Icon(Icons.play_arrow))])]))])))],
       const SizedBox(height:16),Row(children:[Expanded(child:Text('我的书架',style:display.copyWith(fontSize:21))),Text('${entries.length} 本')]),const SizedBox(height:12),
       if (entries.isEmpty)
         Padding(padding: const EdgeInsets.symmetric(vertical: 36),
@@ -298,9 +289,9 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     const titles = ['播放器', '发现', '书架'];
     return Scaffold(
-      extendBodyBehindAppBar:tab==0,
-      appBar: AppBar(backgroundColor:tab==0?Colors.transparent:ivory,foregroundColor:tab==0?Colors.white:null,
-        systemOverlayStyle:tab==0?SystemUiOverlayStyle.light:SystemUiOverlayStyle.dark,
+      extendBodyBehindAppBar:false,
+      appBar: AppBar(backgroundColor:ivory,foregroundColor:const Color(0xff422c20),
+        systemOverlayStyle:SystemUiOverlayStyle.dark,
         leading:tab==0?BackButton(onPressed:()=>setState(()=>tab=2)):null,
         centerTitle: false,
         title: tab==0?null:Text(titles[tab],style:display.copyWith(fontSize:29)),
@@ -308,7 +299,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
           if (tab == 0)
             PopupMenuButton<String>(
               tooltip: '更多',
-              icon: const Icon(Icons.more_horiz,color:Colors.white),
+              icon: const Icon(Icons.more_horiz,color:Color(0xff422c20)),
               itemBuilder: (_) => const [
                 PopupMenuItem(value: 'settings', child: Text('设置')),
               ],
@@ -317,7 +308,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
             ),
         ],
       ),
-      body: SafeArea(top:tab!=0,
+      body: SafeArea(top:true,
         child: ListenableBuilder(
           listenable: Listenable.merge([player.revision, shelf]),
           builder: (_, _) => IndexedStack(
