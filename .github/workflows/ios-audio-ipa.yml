@@ -1,0 +1,43 @@
+name: TingX unsigned experimental IPA
+on:
+  workflow_dispatch:
+  push:
+    branches: [experiment/audio-pipeline]
+    paths:
+      - 'lib/player/**'
+      - 'lib/pages/discover_home.dart'
+      - '.github/workflows/ios-audio-ipa.yml'
+jobs:
+  unsigned-ipa:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate missing iOS runner
+        run: |
+          if [ ! -f ios/Runner.xcodeproj/project.pbxproj ]; then
+            bash tool/prepare_ios.sh
+          fi
+      - name: Resolve dependencies
+        run: flutter pub get
+      - name: Build unsigned device app
+        run: flutter build ios --release --no-codesign --dart-define=TINGX_EXPERIMENTAL_STREAM=true
+      - name: Package unsigned IPA
+        run: |
+          test -d build/ios/iphoneos/Runner.app
+          mkdir -p build/ipa/Payload
+          cp -R build/ios/iphoneos/Runner.app build/ipa/Payload/
+          cd build/ipa
+          zip -qry TingX-Audio-Experimental-unsigned.ipa Payload
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: TingX-Audio-Experimental-unsigned
+          path: build/ipa/TingX-Audio-Experimental-unsigned.ipa
+          if-no-files-found: error
+
+# Rebuild request: retry unsigned IPA after 191e65f color fix - attempt 2

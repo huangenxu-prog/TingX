@@ -1,12 +1,34 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 
 import '../models/book.dart';
+import 'book_jacket.dart';
 import '../services/bili_api.dart';
 
-/// 发现首页：所有作品均来自真实搜索；统计字段必须来自视频详情。
+const _ink = Color(0xff483427);
+const _accent = Color(0xff965b35);
+const _categories = <({String label, List<String> keywords})>[
+  (label: '热门推荐', keywords: ['有声小说']),
+  (label: '广播剧', keywords: ['广播剧 全集']),
+  (label: '评书相声', keywords: ['评书', '相声']),
+  (label: '历史', keywords: ['历史 有声小说']),
+  (label: '都市', keywords: ['都市 有声小说']),
+  (label: '悬疑灵异', keywords: ['悬疑 有声小说', '灵异 有声小说']),
+  (label: '玄幻', keywords: ['玄幻 有声小说']),
+  (label: '仙侠武侠', keywords: ['仙侠 有声小说', '武侠 有声小说']),
+  (label: '科幻', keywords: ['科幻 有声小说']),
+  (label: '言情', keywords: ['言情 有声小说']),
+  (label: '穿越重生', keywords: ['穿越 有声小说', '重生 有声小说']),
+  (label: '军事', keywords: ['军事 有声小说']),
+  (label: '儿童', keywords: ['儿童 有声书']),
+  (label: '名著', keywords: ['世界名著 朗读']),
+];
+
 class DiscoverHome extends StatefulWidget {
-  const DiscoverHome({super.key, required this.openBook});
-  final void Function(Book) openBook;
+  const DiscoverHome({super.key, required this.openBook, required this.listen});
+  final ValueChanged<Book> openBook;
+  final ValueChanged<Book> listen;
 
   @override
   State<DiscoverHome> createState() => _DiscoverHomeState();
@@ -14,227 +36,203 @@ class DiscoverHome extends StatefulWidget {
 
 class _DiscoverHomeState extends State<DiscoverHome> {
   final search = TextEditingController();
-  final api = BiliApi.instance;
-  final categories = const [
-    '历史', '都市', '玄幻', '仙侠', '悬疑', '科幻', '武侠', '军事',
-    '言情', '穿越', '灵异', '名著', '评书', '相声', '广播剧', '文学',
-  ];
-  List<Book> hot = [];
-  List<Book> results = [];
-  List<Book> enriched = [];
-  bool loading = false;
-  bool searching = false;
-  bool loadingMore = false;
-  bool hasMore = false;
-  int searchPage = 1;
-  String? error;
-  String? keyword;
-  final Map<String, int> sectionOffsets = {};
+  final scroll = ScrollController();
+  final books = <Book>[];
+  int category = 0;
+  String query = '';
   int generation = 0;
+  int page = 0;
+  bool busy = false;
+  bool more = true;
+  bool failed = false;
 
   @override
   void initState() {
     super.initState();
-    refresh();
+    load();
+    scroll.addListener(onScroll);
+  }
+
+  void onScroll() {
+    if (!failed && scroll.position.extentAfter < 220) load();
   }
 
   @override
   void dispose() {
-    generation++;
     search.dispose();
+    scroll.dispose();
     super.dispose();
   }
 
-  Future<void> refresh() async {
-    final id = ++generation;
-    setState(() { loading = true; error = null; });
+  void restart(int index, String text) {
+    generation++;
+    category = index;
+    query = text.trim();
+    page = 0;
+    more = true;
+    busy = false;
+    books.clear();
+    if (scroll.hasClients) scroll.jumpTo(0);
+    load();
+  }
+
+  Future<void> load() async {
+    if (busy || !more) return;
+    final id = generation;
+    final next = page + 1;
+    setState(() { busy = true; failed = false; });
     try {
-      final list = await api.rankHotNovel(limit: 30);
-      if (!mounted || id != generation) return;
-      setState(() { hot = list; loading = false; });
-      // 搜索结果只包含播放量，点赞与收藏必须通过详情获取。
-      // 限制为六条，避免一次发出大量请求触发 B 站风控。
-      final details = <Book>[];
-      for (final book in list.take(6)) {
-        if (!mounted || id != generation) return;
-        try {
-          details.add(await api.detail(book.bvid));
-        } catch (_) {
-          // 不用缺失统计的搜索条目冒充点赞/收藏排名。
+      final keywords = query.isNotEmpty
+          ? [query]
+          : _categories[category].keywords;
+      final rawCounts = List<int>.filled(keywords.length, 0);
+      final batches = await Future.wait([
+        for (var i = 0; i < keywords.length; i++)
+          BiliApi.instance.search(
+            keywords[i],
+            page: next,
+            order: query.isEmpty && category == 0 ? 'click' : null,
+            onRawCount: (n) => rawCounts[i] = n,
+          ),
+      ]);
+      // Interleave independently searched categories rather than putting all
+      // results from the first keyword ahead of the second.
+      final list = <Book>[];
+      final longest = batches.fold<int>(0, (n, batch) => batch.length > n ? batch.length : n);
+      for (var offset = 0; offset < longest; offset++) {
+        for (final batch in batches) {
+          if (offset < batch.length) list.add(batch[offset]);
         }
       }
-      if (mounted && id == generation) setState(() => enriched = details);
-    } catch (e) {
-      if (mounted && id == generation) setState(() { error = '推荐加载失败，请重试'; loading = false; });
-    }
-  }
-
-  Future<void> find(String value) async {
-    final q = value.trim();
-    final id = ++generation;
-    setState(() { keyword = q.isEmpty ? null : q; results = []; searching = q.isNotEmpty; hasMore = false; searchPage = 1; error = null; });
-    if (q.isEmpty) { refresh(); return; }
-    try {
-      var rawCount = 0;
-      final list = await api.search(q, onRawCount: (count) => rawCount = count);
-      if (mounted && id == generation) setState(() { results = list; hasMore = rawCount >= 20; });
-    } catch (_) {
-      if (mounted && id == generation) setState(() => error = '搜索失败，请稍后重试');
-    } finally {
-      if (mounted && id == generation) setState(() => searching = false);
-    }
-  }
-
-  Future<void> loadMore() async {
-    final q = keyword;
-    if (q == null || loadingMore || !hasMore) return;
-    final id = generation;
-    final next = searchPage + 1;
-    setState(() => loadingMore = true);
-    try {
-      var rawCount = 0;
-      final more = await api.search(q, page: next,
-        onRawCount: (count) => rawCount = count);
       if (!mounted || id != generation) return;
-      final seen = results.map((b) => b.bvid).toSet();
+      final seen = books.map((book) => book.bvid).toSet();
       setState(() {
-        results.addAll(more.where((b) => seen.add(b.bvid)));
-        searchPage = next;
-        hasMore = rawCount >= 20;
+        books.addAll(list.where((book) => seen.add(book.bvid)));
+        page = next;
+        more = rawCounts.any((count) => count >= 20);
       });
     } catch (_) {
-      if (mounted && id == generation) {
-        setState(() => error = '加载更多失败，请重试');
-      }
+      if (mounted && id == generation) setState(() => failed = true);
     } finally {
-      if (mounted && id == generation) setState(() => loadingMore = false);
+      if (mounted && id == generation) setState(() => busy = false);
     }
   }
 
-  List<Book> batch(String title, List<Book> source) {
-    if (source.isEmpty) return [];
-    final start = (sectionOffsets[title] ?? 0) % source.length;
-    return List.generate(source.length < 6 ? source.length : 6,
-        (i) => source[(start + i) % source.length]);
+  Widget categories() => SingleChildScrollView(
+    scrollDirection: Axis.horizontal,
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    child: Row(children: List.generate(_categories.length, (i) {
+      final title = _categories[i].label;
+      final selected = query.isEmpty && category == i;
+      final color = selected ? Colors.white : _ink;
+      return Padding(padding: const EdgeInsets.only(right: 6), child: Semantics(
+        button: true, selected: selected, child: GestureDetector(onTap: () {
+          FocusScope.of(context).unfocus();
+          search.clear();
+          restart(i, '');
+        }, child: _Glass(selected: selected, child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
+          child: Row(children: [
+            const SizedBox(width: 4), Text(title, style: TextStyle(fontSize: 12, color: color))]),
+        )))));
+    })),
+  );
+
+  Widget tile(Book b) {
+    final title = b.cleanTitle;
+    final match = RegExp(r'(?:演播|播讲|主播)[：:︰]\s*([^｜|【】《》，,。\s]+)').firstMatch('$title ${b.desc}');
+    final credit = match?.group(1) ?? b.author;
+
+    return InkWell(onTap: () => widget.openBook(b), child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Expanded(child: BookJacket(b)),
+        Padding(padding: const EdgeInsets.fromLTRB(3, 5, 3, 0), child: Text(b.displayTitle,
+          maxLines: 1, overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _ink))),
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 3), child: Text(credit,
+          maxLines: 1, overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 11, color: Color(0xff76665a)))),
+      ]));
   }
-
-  Widget bookTile(Book book) => InkWell(
-    onTap: () => widget.openBook(book),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      AspectRatio(
-        aspectRatio: 3 / 4,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: book.pic.isEmpty
-              ? const ColoredBox(color: Color(0xffe8dece), child: Icon(Icons.menu_book))
-              : Image.network(book.pic, fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => const ColoredBox(
-                    color: Color(0xffe8dece), child: Icon(Icons.menu_book))),
-        ),
-      ),
-      const SizedBox(height: 5),
-      Text(book.cleanTitle, maxLines: 2, overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 12)),
-    ]),
-  );
-
-  Widget section(String title, List<Book> source, {bool shuffle = true}) {
-    final books = shuffle ? batch(title, source) : source;
-    return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-        if (shuffle && source.length > 6)
-          TextButton.icon(
-            onPressed: () => setState(() => sectionOffsets[title] = (sectionOffsets[title] ?? 0) + 6),
-            icon: const Icon(Icons.refresh, size: 16),
-            label: const Text('换一批'),
-          ),
-      ]),
-      if (books.isEmpty)
-        const Padding(padding: EdgeInsets.symmetric(vertical: 12),
-          child: Text('暂无可靠数据', style: TextStyle(color: Colors.grey)))
-      else
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: books.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3, childAspectRatio: .56,
-            crossAxisSpacing: 12, mainAxisSpacing: 12),
-          itemBuilder: (_, i) => bookTile(books[i]),
-        ),
-      const SizedBox(height: 14),
-    ],
-  );
-  }
-
-  Widget categoryStrip() => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const Text('分类', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-      const SizedBox(height: 10),
-      SizedBox(height: 112, child: PageView.builder(
-        itemCount: (categories.length / 8).ceil(),
-        itemBuilder: (_, page) => GridView.count(
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 4, childAspectRatio: 2.3,
-          crossAxisSpacing: 8, mainAxisSpacing: 8,
-          children: categories.skip(page * 8).take(8).map((name) =>
-            OutlinedButton(
-              onPressed: () { search.text = name; find('$name 有声小说'); },
-              style: OutlinedButton.styleFrom(padding: EdgeInsets.zero),
-              child: Text(name, style: const TextStyle(fontSize: 12)),
-            )).toList(),
-        ),
-      )),
-      const SizedBox(height: 18),
-    ],
-  );
 
   @override
   Widget build(BuildContext context) {
-    final ranked = [...enriched];
-    final byFavorite = [...ranked]..sort((a, b) => b.favorite.compareTo(a.favorite));
-    final byLike = [...ranked]..sort((a, b) => b.like.compareTo(a.like));
-    return ListView(padding: const EdgeInsets.all(16), children: [
-      TextField(
-        controller: search,
-        textInputAction: TextInputAction.search,
-        onSubmitted: find,
-        decoration: InputDecoration(
-          hintText: '搜索有声小说、作者、演播者',
-          prefixIcon: const Icon(Icons.search),
-          suffixIcon: IconButton(
-            icon: Icon(keyword == null ? Icons.arrow_forward : Icons.close),
-            onPressed: () {
-              if (keyword != null) { search.clear(); find(''); }
-              else { find(search.text); }
-            },
-          ),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)),
-        ),
-      ),
-      if (loading || searching) const LinearProgressIndicator(),
-      if (error != null) Padding(padding: const EdgeInsets.all(12), child: Text(error!)),
-      const SizedBox(height: 20),
-      if (keyword != null) ...[
-        section('搜索结果', results, shuffle: false),
-        if (hasMore || loadingMore)
-          TextButton(
-            onPressed: loadingMore ? null : loadMore,
-            child: Text(loadingMore ? '加载中…' : '加载更多'),
-          ),
-      ]
-      else ...[
-        section('热门推荐', hot),
-        categoryStrip(),
-        section('收藏榜', byFavorite.where((b) => b.favorite > 0).toList()),
-        section('热播榜', hot),
-        section('高赞榜', byLike.where((b) => b.like > 0).toList()),
-        TextButton(onPressed: refresh, child: const Text('刷新推荐')),
-      ],
-    ]);
+    final heading = query.isNotEmpty ? '搜索结果' : category == 0 ? '热门榜单' : _categories[category].label;
+    final featured = category == 0 && query.isEmpty && books.isNotEmpty;
+    return DecoratedBox(decoration: const BoxDecoration(gradient: LinearGradient(
+      begin: Alignment.topCenter, end: Alignment.bottomCenter,
+      colors: [ivory, ivory, ivory],
+      stops: [0, .23, 1])), child: Column(children: [
+        Padding(padding: const EdgeInsets.fromLTRB(14, 4, 14, 4), child: TextField(
+          controller: search, textInputAction: TextInputAction.search,
+          onSubmitted: (v) => restart(category, v),
+          decoration: InputDecoration(isDense: true, filled: true, fillColor: Colors.white38,
+            hintText: '搜索书名 / 作者 / 主播', prefixIcon: const Icon(Icons.search, color: _ink),
+            suffixIcon: query.isEmpty ? null : IconButton(icon: const Icon(Icons.close),
+              onPressed: () { search.clear(); restart(category, ''); }),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(26),
+              borderSide: const BorderSide(color: Color(0xffd7c2ae))),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(26))))),
+        categories(),
+        Padding(padding: const EdgeInsets.fromLTRB(14, 2, 4, 0), child: Row(children: [
+          Icon(query.isEmpty ? (category == 0 ? Icons.local_fire_department_outlined : Icons.category_outlined) : Icons.search, size: 17, color: _accent),
+          const SizedBox(width: 5),
+          Expanded(child: Text(heading, style: const TextStyle(fontSize: 18, color: _ink, fontWeight: FontWeight.w600))),
+          Text('${books.length} 个结果', style: const TextStyle(color: _ink, fontSize: 12)),
+          IconButton(tooltip: '刷新', onPressed: () => restart(category, query),
+            icon: const Icon(Icons.refresh, size: 19, color: _ink))])),
+        Expanded(child: CustomScrollView(controller: scroll, slivers: [
+          SliverPadding(padding: const EdgeInsets.symmetric(horizontal: 18), sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2,
+              crossAxisSpacing: 12, mainAxisSpacing: 16, childAspectRatio: 1.28),
+            delegate: SliverChildBuilderDelegate((_, i) => tile(books[i]), childCount: books.length))),
+          SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.all(10), child: Center(child:
+            busy ? const CircularProgressIndicator(strokeWidth: 2) :
+            failed || more ? TextButton(onPressed: load, child: Text(failed ? '加载失败，点此重试' : '加载更多')) :
+            books.isEmpty ? const Text('暂无相关有声书') : const SizedBox.shrink()))),
+        ]))
+      ]));
   }
+}
+
+class _Glass extends StatelessWidget {
+  const _Glass({required this.child, this.selected = false});
+  final Widget child;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(borderRadius: BorderRadius.circular(32),
+      boxShadow: const [BoxShadow(color: Color(0x19744c30), blurRadius: 6, offset: Offset(0, 2))]),
+    child: ClipRRect(borderRadius: BorderRadius.circular(32), child: BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8), child: DecoratedBox(
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(32),
+          border: Border.all(color: Colors.white70),
+          gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
+            colors: selected ? const [Color(0xffb97c50), _accent]
+              : const [Color(0xe6fff9ef), Color(0xb9f2e7db)])), child: child))));
+}
+
+class TingXTabBar extends StatelessWidget {
+  const TingXTabBar({super.key, required this.index, required this.select});
+  final int index;
+  final ValueChanged<int> select;
+
+  @override
+  Widget build(BuildContext context) => SafeArea(top: false, child: Padding(
+    padding: const EdgeInsets.fromLTRB(12, 4, 12, 5), child: _Glass(child: Padding(
+      padding: const EdgeInsets.all(3), child: Row(children: List.generate(3, (i) {
+        final selected = index == i;
+        final label = const ['播放器', '发现', '书架'][i];
+        return Expanded(child: Semantics(button: true, selected: selected,
+          child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => select(i),
+            child: AnimatedContainer(duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              decoration: BoxDecoration(borderRadius: BorderRadius.circular(28),
+                color: selected ? const Color(0xfff8d6b6) : Colors.transparent),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Icon(const [Icons.headphones, Icons.explore_outlined, Icons.menu_book_outlined][i],
+                  size: 21, color: _ink), Text(label, style: const TextStyle(color: _ink, fontSize: 12))
+              ])))));
+      }))))));
 }

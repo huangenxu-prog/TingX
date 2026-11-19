@@ -6,7 +6,8 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:just_audio/just_audio.dart';
+import 'package:media_kit/media_kit.dart' show MediaKit;
+import 'package:tingx/player/bili_stream_audio_source.dart';
 import 'package:tingx/core/storage/shelf_store.dart';
 import 'package:tingx/models/book.dart';
 import 'package:tingx/player/listening_session.dart';
@@ -45,6 +46,7 @@ Future<File> tone(Directory dir, int seconds) async {
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  MediaKit.ensureInitialized();
   testWidgets('iOS plays, advances chapters and resumes the saved offset', (
     tester,
   ) async {
@@ -55,7 +57,7 @@ void main() {
     final session = await AudioService.init(
       builder: () => ListeningSession(
         chapterSources: (_, cid) async => [
-          AudioSource.file(cid == 1 ? first.path : second.path),
+          BiliStreamAudioSource(uri: cid == 1 ? first.uri : second.uri, referer: "", userAgent: "TingX"),
         ],
       ),
     );
@@ -72,13 +74,13 @@ void main() {
     expect(session.error, isNull);
     final until = DateTime.now().add(const Duration(seconds: 20));
     while ((session.chapter?.cid != 2 ||
-            !session.audio.playing ||
+            !session.audio.state.playing ||
             !session.ready) &&
         DateTime.now().isBefore(until)) {
       await Future<void>.delayed(const Duration(milliseconds: 200));
     }
     expect(session.chapter?.cid, 2);
-    expect(session.audio.playing, isTrue);
+    expect(session.audio.state.playing, isTrue);
     await session.seek(const Duration(seconds: 8));
     await session.pause();
     await ShelfStore.instance.load();
@@ -92,7 +94,7 @@ void main() {
       offset: saved.positionMs,
     );
     expect(session.error, isNull);
-    expect(session.audio.position.inMilliseconds, closeTo(8000, 1500));
+    expect(session.audio.state.position.inMilliseconds, closeTo(8000, 1500));
     await session.pause();
     await session.audio.dispose();
     await dir.delete(recursive: true);
