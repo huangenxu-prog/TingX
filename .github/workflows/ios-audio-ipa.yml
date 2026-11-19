@@ -40,4 +40,4 @@ jobs:
           path: build/ipa/TingX-Audio-Experimental-unsigned.ipa
           if-no-files-found: error
 
-# Rebuild request: player artwork actual clip d438b0a
+# Rebuild request: local cover templates and portrait player 6318ace
