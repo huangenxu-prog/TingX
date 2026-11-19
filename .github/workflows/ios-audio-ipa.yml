@@ -40,4 +40,4 @@ jobs:
           path: build/ipa/TingX-Audio-Experimental-unsigned.ipa
           if-no-files-found: error
 
-# Rebuild request: genre filters and audiobook titles 5b25f08
+# Rebuild request: category interleaving 0ea6f29
