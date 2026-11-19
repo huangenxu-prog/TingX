@@ -537,16 +537,21 @@ class _DetailState extends State<Detail> {
             ]);
             final i = row - 1;
             final selected = i == (last < 0 ? 0 : last);
-            return InkWell(onTap: () => choose(i), child: Container(
-              constraints: const BoxConstraints(minHeight: 44),
-              decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: rule,width: .5))),
-              child: Row(children: [
-                SizedBox(width: 3,child: selected ? marker() : null),
-                const SizedBox(width: 13),
-                Expanded(child: Text(partLabel(parts[i].part),style: type.copyWith(
-                  fontSize: 17,color: selected ? brown : ink))),
-                Text('${done.contains(parts[i].cid) ? "✓  " : ""}${parts[i].durationText}',style: type),
-              ]),
+            return InkWell(onTap: () => choose(i), child: SizedBox(
+              height: 54,
+              child: DecoratedBox(
+                decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: rule,width: .5))),
+                child: Row(children: [
+                  SizedBox(width: 3,child: selected ? marker() : null),
+                  const SizedBox(width: 13),
+                  Expanded(child: Text(partLabel(parts[i].part),
+                    maxLines: 1, softWrap: false, overflow: TextOverflow.ellipsis,
+                    style: type.copyWith(fontSize: 17,color: selected ? brown : ink))),
+                  const SizedBox(width: 8),
+                  Text('${done.contains(parts[i].cid) ? "✓  " : ""}${parts[i].durationText}',
+                    maxLines: 1, softWrap: false, style: type),
+                ]),
+              ),
             ));
           },
         );
