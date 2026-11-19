@@ -40,4 +40,4 @@ jobs:
           path: build/ipa/TingX-Audio-Experimental-unsigned.ipa
           if-no-files-found: error
 
-# Rebuild request: split children and classics 19e081d
+# Rebuild request: remove discovery ranking badges 6a6178e
