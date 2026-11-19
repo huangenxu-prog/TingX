@@ -24,7 +24,7 @@ class BookJacket extends StatelessWidget {
             ? unavailable
             : Image.network(
                 url,
-                fit: BoxFit.cover,
+                fit: BoxFit.contain,
                 semanticLabel: shortTitle(book),
                 errorBuilder: (_, __, ___) => unavailable,
               ),
