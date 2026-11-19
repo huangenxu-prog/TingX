@@ -40,4 +40,4 @@ jobs:
           path: build/ipa/TingX-Audio-Experimental-unsigned.ipa
           if-no-files-found: error
 
-# Rebuild request: local cover templates and portrait player 6318ace
+# Rebuild request: fresh unsigned IPA run after cancelled attempts
