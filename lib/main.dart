@@ -140,8 +140,9 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     final b = player.book ?? recent?.book;
     if(b==null)return Center(child:TextButton(onPressed:()=>setState(()=>tab=1),child:const Text('去发现有声书')));
     final idle=player.book==null;
-    return LayoutBuilder(builder:(context,size)=>Column(mainAxisAlignment:MainAxisAlignment.spaceEvenly,children:[
-      Padding(padding:const EdgeInsets.fromLTRB(14,16,14,16),child:AspectRatio(aspectRatio:16/9,child:cover(b))),
+    return LayoutBuilder(builder:(context,size)=>Column(mainAxisAlignment:MainAxisAlignment.center,children:[
+      Padding(padding:const EdgeInsets.symmetric(horizontal:14),child:ClipRRect(borderRadius:BorderRadius.circular(12),child:AspectRatio(aspectRatio:16/9,child:cover(b)))),
+      const SizedBox(height:24),
       SizedBox(height:(size.maxHeight*.43).clamp(182.0,318.0),child:FittedBox(fit:BoxFit.scaleDown,child:SizedBox(width:size.maxWidth,child:Column(children:[
         const SizedBox(height:8),
         Text(shortTitle(b),maxLines:1,overflow:TextOverflow.ellipsis,style:display.copyWith(fontSize:22)),
