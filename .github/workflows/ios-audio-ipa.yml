@@ -40,4 +40,4 @@ jobs:
           path: build/ipa/TingX-Audio-Experimental-unsigned.ipa
           if-no-files-found: error
 
-# Rebuild request: player control size and spacing 41b3e96
+# Rebuild request: restore white playback icon 9188445
