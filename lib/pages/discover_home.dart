@@ -138,14 +138,14 @@ class _DiscoverHomeState extends State<DiscoverHome> {
     })),
   );
 
-  Widget tile(Book b, int rank) {
+  Widget tile(Book b) {
     final title = b.cleanTitle;
     final match = RegExp(r'(?:演播|播讲|主播)[：:︰]\s*([^｜|【】《》，,。\s]+)').firstMatch('$title ${b.desc}');
     final credit = match?.group(1) ?? b.author;
 
     return InkWell(onTap: () => widget.openBook(b), child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Expanded(child:Stack(fit:StackFit.expand,children:[BookJacket(b),if(rank>0)Positioned(left:6,top:6,child:CircleAvatar(radius:11,backgroundColor:ivory,child:Text('$rank',style:const TextStyle(color:_ink,fontSize:12))))])),
+        Expanded(child: BookJacket(b)),
         Padding(padding: const EdgeInsets.fromLTRB(3, 5, 3, 0), child: Text(b.displayTitle,
           maxLines: 1, overflow: TextOverflow.ellipsis,
           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _ink))),
@@ -193,7 +193,7 @@ class _DiscoverHomeState extends State<DiscoverHome> {
           SliverPadding(padding: const EdgeInsets.symmetric(horizontal: 18), sliver: SliverGrid(
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3,
               crossAxisSpacing: 8, mainAxisSpacing: 15, childAspectRatio: .62),
-            delegate: SliverChildBuilderDelegate((_, i) => tile(books[i+(featured?1:0)], featured?i+2:0), childCount: books.length-(featured?1:0)))),
+            delegate: SliverChildBuilderDelegate((_, i) => tile(books[i+(featured?1:0)]), childCount: books.length-(featured?1:0)))),
           SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.all(10), child: Center(child:
             busy ? const CircularProgressIndicator(strokeWidth: 2) :
             failed || more ? TextButton(onPressed: load, child: Text(failed ? '加载失败，点此重试' : '加载更多')) :
