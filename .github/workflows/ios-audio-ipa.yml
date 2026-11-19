@@ -40,4 +40,4 @@ jobs:
           path: build/ipa/TingX-Audio-Experimental-unsigned.ipa
           if-no-files-found: error
 
-# Rebuild request: detail chapter play icons 381d75c
+# Rebuild request: rounded player cover f329677
