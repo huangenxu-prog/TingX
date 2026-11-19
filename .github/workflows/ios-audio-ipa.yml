@@ -40,4 +40,4 @@ jobs:
           path: build/ipa/TingX-Audio-Experimental-unsigned.ipa
           if-no-files-found: error
 
-# Rebuild request: remove featured and continue cards 20d4485
+# Rebuild request: unified rounded book covers b1a3865
