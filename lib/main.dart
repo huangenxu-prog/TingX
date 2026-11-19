@@ -331,7 +331,7 @@ Widget cover(Book? b) {
   );
   if (b == null || b.pic.isEmpty) return fallback;
   return ClipRRect(
-    borderRadius: BorderRadius.circular(8),
+    borderRadius: BorderRadius.circular(12),
     child: Image.network(
       b.pic,
       fit: BoxFit.contain,
@@ -479,30 +479,18 @@ class _DetailState extends State<Detail> {
           itemCount: parts.length + 1,
           itemBuilder: (_, row) {
             if (row == 0) return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Container(width: 160, height: 90, margin: const EdgeInsets.only(left: 6),
-                  decoration: const BoxDecoration(boxShadow: [
-                    BoxShadow(color: Color(0x55442b18), blurRadius: 8, offset: Offset(-2,5))
-                  ]),
-                  child: Stack(fit: StackFit.expand, children: [
-                    BookJacket(b),
-                    Positioned(left: 4, top: 5, bottom: 5, child: Container(width: 5,
-                      decoration: const BoxDecoration(gradient: LinearGradient(
-                        colors: [Colors.black38, Colors.white24, Colors.transparent])))),
-                  ])),
-                const SizedBox(width: 16),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Wrap(spacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
-                    Text(shortTitle(b), style: type.copyWith(fontSize: 30,fontWeight: FontWeight.bold)),
-                    if (complete) Container(padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
-                      decoration: BoxDecoration(color: const Color(0xff9d382e), borderRadius: BorderRadius.circular(4)),
-                      child: const Text('完\n结',style: TextStyle(color: Colors.white,fontSize: 11,height: 1))),
-                  ]),
-                  const SizedBox(height: 9),
-                  if (b.author.isNotEmpty) Text('上传者：${b.author}',style: type),
-                  if (total != null) Text('全 ${total[1]}集',style: type),
-                ])),
-              ]),
+              AspectRatio(aspectRatio: 16 / 9, child: BookJacket(b)),
+              const SizedBox(height: 14),
+              Text(shortTitle(b), maxLines: 2, overflow: TextOverflow.ellipsis,
+                style: type.copyWith(fontSize: 24, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              if (complete) Padding(padding: const EdgeInsets.only(bottom: 6),
+                child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  decoration: BoxDecoration(color: const Color(0xff9d382e),
+                    borderRadius: BorderRadius.circular(4)),
+                  child: const Text('完结', style: TextStyle(color: Colors.white, fontSize: 12)))),
+              if (b.author.isNotEmpty) Text('上传者：${b.author}', style: type),
+              if (total != null) Text('全 ${total[1]}集', style: type),
               if (description.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 15),
                 child: Row(crossAxisAlignment: CrossAxisAlignment.end,children: [
                   Expanded(child: Text(description,maxLines: expanded ? null : 2,
@@ -510,16 +498,6 @@ class _DetailState extends State<Detail> {
                   TextButton(onPressed: () => setState(() => expanded = !expanded),
                     child: Text(expanded ? '收起 ⌃' : '展开 ﹀',style: type.copyWith(color: brown))),
                 ])),
-              const SizedBox(height: 18),
-              Row(children: [
-                FilledButton.icon(style: FilledButton.styleFrom(backgroundColor: brown,
-                  minimumSize: const Size(158,42)),onPressed: () => choose(last < 0 ? 0 : last),
-                  icon: const Icon(Icons.play_arrow),label: Text(last < 0 ? '开始收听' : '继续收听')),
-                if (last >= 0) ...[
-                  Container(width: 1,height: 18,margin: const EdgeInsets.symmetric(horizontal: 10),color: rule),
-                  Expanded(child: Text('上次听到第${last+1}章 · ${saved!.positionText}',style: type.copyWith(fontSize: 13))),
-                ],
-              ]),
               const Divider(height: 40,color: rule,thickness: .6),
               Row(children: [marker(),const SizedBox(width: 12),
                 Text('收听目录',style: type.copyWith(fontSize: 21,fontWeight: FontWeight.bold)),
@@ -541,6 +519,14 @@ class _DetailState extends State<Detail> {
                   const SizedBox(width: 8),
                   Text('${done.contains(parts[i].cid) ? "✓  " : ""}${parts[i].durationText}',
                     maxLines: 1, softWrap: false, style: type),
+                  const SizedBox(width: 12),
+                  Container(width: 30, height: 30,
+                    decoration: BoxDecoration(
+                      color: selected ? brown : const Color(0xfff6e9dd),
+                      shape: BoxShape.circle,
+                      border: selected ? null : Border.all(color: const Color(0xffc9a58a))),
+                    child: Icon(Icons.play_arrow_rounded, size: 20,
+                      color: selected ? Colors.white : brown)),
                 ]),
               ),
             ));
