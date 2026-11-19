@@ -40,4 +40,4 @@ jobs:
           path: build/ipa/TingX-Audio-Experimental-unsigned.ipa
           if-no-files-found: error
 
-# Rebuild request: category interleaving 0ea6f29
+# Rebuild request: split children and classics 19e081d
