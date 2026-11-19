@@ -123,7 +123,7 @@ class _DiscoverHomeState extends State<DiscoverHome> {
     return InkWell(onTap: () => widget.openBook(b), child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Expanded(child:Stack(fit:StackFit.expand,children:[BookJacket(b),if(rank>0)Positioned(left:6,top:6,child:CircleAvatar(radius:11,backgroundColor:ivory,child:Text('$rank',style:const TextStyle(color:_ink,fontSize:12))))])),
-        Padding(padding: const EdgeInsets.fromLTRB(3, 5, 3, 0), child: Text(title,
+        Padding(padding: const EdgeInsets.fromLTRB(3, 5, 3, 0), child: Text(b.displayTitle,
           maxLines: 1, overflow: TextOverflow.ellipsis,
           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _ink))),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 3), child: Text(credit,

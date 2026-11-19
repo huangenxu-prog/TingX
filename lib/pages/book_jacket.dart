@@ -5,7 +5,7 @@ const brown = Color(0xff894d2d);
 const ivory = Color(0xfffaf3e9);
 const display = TextStyle(fontFamily: 'Songti SC', fontWeight: FontWeight.bold, color: Color(0xff402a1c));
 
-String shortTitle(Book book) => RegExp('《([^》]+)》').firstMatch(book.cleanTitle)?.group(1) ?? book.cleanTitle;
+String shortTitle(Book book) => book.displayTitle;
 
 class BookJacket extends StatelessWidget {
   const BookJacket(this.book, {super.key});

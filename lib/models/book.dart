@@ -45,6 +45,37 @@ class Book {
       .replaceAll('<em class="keyword">', '')
       .replaceAll('</em>', '');
 
+  // Keep source metadata for episode counts, credits, search and persistence.
+  static final _quoted = RegExp(r'《([^《》]+)》|<([^<>]+)>');
+  static final _label = RegExp(
+    r'^(?:【|［|\[|（|\()?(?:多人有声剧|有声小说|有声书|超长爽文|无删减版|完整版|全集|已完结|完结)(?:】|］|\]|）|\))?[\s:：·｜|\-]*',
+  );
+  static final _suffix = RegExp(
+    r'(?:[\s｜|·\-]+(?:by\s*|演播[：:]|播讲[：:]).+|[\s｜|·\-]*(?:【|（|\[|\()?(?:有声小说|有声书|超长爽文|无删减版|完整版|全集|已完结|完结|(?:全|共)\s*\d+\s*集)(?:】|）|\]|\))?)$',
+    caseSensitive: false,
+  );
+
+  late final String displayTitle = _displayTitle(cleanTitle);
+
+  static String _displayTitle(String source) {
+    final decoded = source.replaceAll('&amp;', '&').replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>').replaceAll('&nbsp;', ' ').trim();
+    final quoted = _quoted.firstMatch(decoded);
+    if (quoted != null) {
+      final name = (quoted[1] ?? quoted[2]!).trim();
+      final volume = RegExp(r'^\s*(第[一二三四五六七八九十百\d]+[部卷季]|[上中下][部册卷])')
+          .firstMatch(decoded.substring(quoted.end));
+      if (name.isNotEmpty) return volume == null ? name : '$name ${volume[1]}';
+    }
+    var result = decoded;
+    while (result.isNotEmpty) {
+      final next = result.replaceFirst(_label, '').replaceFirst(_suffix, '').trim();
+      if (next == result) break;
+      result = next;
+    }
+    return result.isEmpty ? decoded : result;
+  }
+
   /// 归一化封面地址：`//i0.hdslb.com/...` 与 http 源统一转 https
   static String normalizePic(String input) {
     final u = input.trim();

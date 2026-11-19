@@ -313,7 +313,7 @@ class ListeningSession extends BaseAudioHandler {
         MediaItem(
           id: '${selected.bvid}/${current.cid}',
           title: current.part,
-          album: selected.cleanTitle,
+          album: selected.displayTitle,
           artist: selected.author,
           duration: audio.state.duration,
           artUri: selected.pic.isEmpty ? null : Uri.tryParse(selected.pic),
